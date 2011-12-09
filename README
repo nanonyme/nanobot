@@ -1,2 +1,17 @@
+General
+----------
 Main upstream repo is at https://bitbucket.org/nanonyme/nanobot/overview so please file bugs there.
 Github repo https://github.com/nanonyme/nanobot is synced with it regurarly.
+
+Installing
+----------
+Highly recommended twisted from svn (svn://svn.twistedmatrix.com/svn/Twisted/trunk), it's more stable 
+than the release versions when this was written. exocet is available from https://launchpad.net/exocet.
+
+Plugins documentation must clearly tell additional requirements. If you feel this isn't the case, please
+file a bug.
+
+Testing
+---------
+nose recommended for running tests. Tests require mock; installing unittest2 highly recommended if using
+Python 2.6.

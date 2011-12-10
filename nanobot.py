@@ -111,16 +111,14 @@ class NanoBot(object, service.MultiService):
     def _rehash(self):
         log.msg("Beginning rehash")
         for plugin in self:
-            try:
-                plugin.disownServiceParent()
-            except AttributeError:
-                self.removeService(plugin)
-        for plugin_module in exocet.getModule("plugins_enabled").iterModules():
-            for plugin in plugin_module.iterExportNames():
-                try:
+            plugin.disownServiceParent()
+        for module_iter in exocet.getModule("plugins_enabled").iterModules():
+            plugin_module = exocet.load(module_iter, exocet.pep302Mapper)
+            for plugin_name in module_iter.iterExportNames():
+                plugin_class = getattr(plugin_module, plugin_name)
+                if issubclass(plugin_class, Service):
+                    plugin = plugin_class()
                     plugin.setServiceParent(self)
-                except AttributeError:
-                    pass
         log.msg("Finished rehash")
 
     def cmd_rehash(self, instance, user, channel, parameters):

@@ -4,15 +4,25 @@ try:
 except ImportError:
     import unittest
 import mock
-import url_finder
+import exocet
+import twisted.internet
+
+class MockReactor(object):
+    def callLater(self, delay, callable, instance, description, url):
+        self.description = description
+        self.url = url
 
 class TestWellDefinedURLs(unittest.TestCase):
     def setUp(self):
         """Mock some stuff up"""
+        import sys
+        self.reactor = MockReactor()
+        import base_url_handler
+        base_url_handler.reactor = self.reactor
         self.parent = service.MultiService()
         self.parent.delegate = self.collect_delegated_data
-        self.testable = url_finder.URLFinder()
-        self.parent.addService(self.testable)
+        self.testable = base_url_handler.URLFinder()
+        self.testable.setServiceParent(self.parent)
         self.user = "foo!bar@baz"
         self.channel = "#testchannel"
         self.instance = mock.Mock()
@@ -23,21 +33,19 @@ class TestWellDefinedURLs(unittest.TestCase):
                                user, channel, url, *args, **kwargs):
         self.data = {'description':description, 'url':url}
     
-    @unittest.expectedFailure
+
     def test_url_at_beginning(self):
         message = "http://www.google.fi/webhp?aq=0 and some other text"
         self.testable.privmsg(self.instance, self.user, self.channel,
                               message)
         self.validate_data()
 
-    @unittest.expectedFailure
     def test_url_in_middle(self):
         message = "awe http://www.google.fi/webhp?aq=0 vwer"
         self.testable.privmsg(self.instance, self.user, self.channel,
                               message)
         self.validate_data()
                         
-    @unittest.expectedFailure
     def test_url_at_end(self):
         message = "useless crap and finally   http://www.google.fi/webhp?aq=0"
         self.testable.privmsg(self.instance, self.user, self.channel,
@@ -46,10 +54,9 @@ class TestWellDefinedURLs(unittest.TestCase):
                 
 
     def validate_data(self):
-        self.assertEqual(self.data.get('description', ''), 'google',
+        self.assertEqual(self.reactor.description, 'handle_url',
                          'description was not google')
-        self.assertEqual(self.data.get('url', ''),
-                         "http://www.google.fi/webhp?aq=0",
+        self.assertEqual(self.reactor.url, "http://www.google.fi/webhp?aq=0",
                          "url did not contain the full URL")
         
         

@@ -171,15 +171,17 @@ class NanoBot(object, service.MultiService):
     def delegate(self, instance, description, *args, **kwargs):
         try:
             f = getattr(self, description)
+        except AttributeError:
+            pass
+        else:
             f(instance, *args, **kwargs)
-        except Exception, e:
-            log.err("%s" % str(e))
         for plugin in self:
             try:
                 f = getattr(plugin, description)
+            except AttributeError:
+                pass
+            else:
                 f(self, instance, *args, **kwargs)
-            except Exception, e:
-                log.err("%s" % str(e))
         
 
 if __name__ == '__main__':

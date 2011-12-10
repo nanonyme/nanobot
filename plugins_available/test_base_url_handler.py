@@ -8,7 +8,8 @@ import exocet
 import twisted.internet
 
 class MockReactor(object):
-    def callLater(self, delay, callable, instance, description, url):
+    def callLater(self, delay, callable, instance,
+                  description, user, channel, url):
         self.description = description
         self.url = url
 
@@ -34,19 +35,19 @@ class TestWellDefinedURLs(unittest.TestCase):
         self.data = {'description':description, 'url':url}
     
 
-    def test_url_at_beginning(self):
+    def test_http_beginning(self):
         message = "http://www.google.fi/webhp?aq=0 and some other text"
         self.testable.privmsg(self.instance, self.user, self.channel,
                               message)
         self.validate_data()
 
-    def test_url_in_middle(self):
+    def test_http_middle(self):
         message = "awe http://www.google.fi/webhp?aq=0 vwer"
         self.testable.privmsg(self.instance, self.user, self.channel,
                               message)
         self.validate_data()
                         
-    def test_url_at_end(self):
+    def test_http_end(self):
         message = "useless crap and finally   http://www.google.fi/webhp?aq=0"
         self.testable.privmsg(self.instance, self.user, self.channel,
                               message)

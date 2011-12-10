@@ -7,6 +7,7 @@ import socket
 import exocet
 from twisted.python import log
 import re
+import urllib
 
 def resolve(server, port, callback, *args, **kwargs):
     addresses = []
@@ -89,6 +90,7 @@ class NanoBotFactory(ReconnectingFactory):
 class NanoBot(object, service.MultiService):
     def __init__(self, configfile):
         service.MultiService.__init__(self)
+        self.url_cache = dict()
         self._rehash()
         with open(configfile) as f:
             self.config = load(f, Loader=Loader)
@@ -137,13 +139,17 @@ class NanoBot(object, service.MultiService):
                         instance.join(channel['name'])
                 break
 
-    def reply(self, instance, user, channel, message):
+    def reply(self, instance, user, channel, message, direct=True):
+        if 'unicode' in str(type(message)):
+            encoding = self.config['core'].get('encoding', 'utf-8')
+            message = message.encode(encoding)
         nick, _, _ = user.partition("!")
-        log.msg(nick)
         if instance.nickname == channel:
             instance.msg(nick, message)
-        else:
+        elif direct:
             instance.msg(channel, "%s, %s" % (nick, message))
+        else:
+            instance.msg(channel, message)
 
     def privmsg(self, instance, user, channel, message):
         cmd = False
@@ -169,6 +175,25 @@ class NanoBot(object, service.MultiService):
             self.delegate(instance, "cmd_" + command, user, channel,
                           parameters)
 
+    def fetch_url(self, url):
+        name = self.url_cache.get(url, None)
+        if name:
+            try:
+                f = open(name)
+            except IOError:
+                del self.url_cache[url]
+                f = None
+        if not name:
+            try:
+                name, _ = urllib.urlretrieve(url)
+            except IOError:
+                log.err("Couldn't connect to %s" % url)
+                return
+            self.url_cache[url] = name
+        with open(name) as f:
+            return f.read()
+            
+
     def delegate(self, instance, description, *args, **kwargs):
         try:
             f = getattr(self, description)
@@ -182,7 +207,8 @@ class NanoBot(object, service.MultiService):
             except AttributeError:
                 pass
             else:
-                f(self, instance, *args, **kwargs)
+                print args
+                f(instance, *args, **kwargs)
         
 
 if __name__ == '__main__':

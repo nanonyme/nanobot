@@ -89,6 +89,7 @@ class NanoBotFactory(ReconnectingFactory):
 class NanoBot(object, service.MultiService):
     def __init__(self, configfile):
         service.MultiService.__init__(self)
+        self._rehash()
         with open(configfile) as f:
             self.config = load(f, Loader=Loader)
         factory = NanoBotFactory(self, self.config)
@@ -116,7 +117,7 @@ class NanoBot(object, service.MultiService):
             plugin_module = exocet.load(module_iter, exocet.pep302Mapper)
             for plugin_name in module_iter.iterExportNames():
                 plugin_class = getattr(plugin_module, plugin_name)
-                if issubclass(plugin_class, Service):
+                if issubclass(plugin_class, service.Service):
                     plugin = plugin_class()
                     plugin.setServiceParent(self)
         log.msg("Finished rehash")

@@ -207,7 +207,6 @@ class NanoBot(object, service.MultiService):
             except AttributeError:
                 pass
             else:
-                print args
                 f(instance, *args, **kwargs)
         
 

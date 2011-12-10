@@ -2,7 +2,7 @@ from yaml import load, Loader
 
 from twisted.words.protocols import irc
 from twisted.application import service
-from twisted.internet import reactor, protocol, ssl, endpoints
+from twisted.internet import reactor, protocol
 import socket
 import exocet
 from twisted.python import log
@@ -95,7 +95,6 @@ class NanoBot(object, service.MultiService):
         for network in self.config['networks']:
             server = network['server']
             port = int(network.get('port', 6667))
-            timeout = int(network.get('timeout', 30))
             reactor.callInThread(resolve, server, port, self.connect, factory)
 
     def connect(self, server, port, addrinfo, factory):
@@ -112,11 +111,16 @@ class NanoBot(object, service.MultiService):
     def _rehash(self):
         log.msg("Beginning rehash")
         for plugin in self:
-            self.removeService(plugin)
+            try:
+                plugin.disownServiceParent()
+            except AttributeError:
+                self.removeService(plugin)
         for plugin_module in exocet.getModule("plugins_enabled").iterModules():
             for plugin in plugin_module.iterExportNames():
-                if issubclass(plugin, service.MultiService):
-                    self.addService(plugin)
+                try:
+                    plugin.setServiceParent(self)
+                except AttributeError:
+                    pass
         log.msg("Finished rehash")
 
     def cmd_rehash(self, instance, user, channel, parameters):

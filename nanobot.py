@@ -1,5 +1,5 @@
 from yaml import load, Loader
-
+from zope.interface import implements
 from twisted.words.protocols import irc
 from twisted.application import service
 from twisted.internet import reactor, protocol
@@ -8,6 +8,7 @@ import exocet
 from twisted.python import log
 import re
 import urllib
+
 
 def resolve(server, port, callback, *args, **kwargs):
     addresses = []
@@ -87,10 +88,12 @@ class NanoBotFactory(ReconnectingFactory):
         self.network_mapping[address] = network
 
 
-class NanoBot(object, service.MultiService):
+class NanoBot(object):
+    implements(service.IServiceCollection)
     def __init__(self, configfile):
-        service.MultiService.__init__(self)
         self.url_cache = dict()
+        self._services = dict()
+        self._services = dict()
         self._rehash()
         with open(configfile) as f:
             self.config = load(f, Loader=Loader)
@@ -99,6 +102,24 @@ class NanoBot(object, service.MultiService):
             server = network['server']
             port = int(network.get('port', 6667))
             reactor.callInThread(resolve, server, port, self.connect, factory)
+
+    def addService(self, s):
+        if str(s) in self._services:
+            raise RuntimeError("Two services with same name not allowed")
+        self._services[str(s)] = s
+
+    def removeService(self, s):
+        if str(s) in self._services:
+            del self._services[str(s)]
+
+    def __iter__(self):
+        for s in self._services:
+            yield self._services[s]
+
+    def getServiceNamed(self, name):
+        if name not in self._services:
+            raise KeyError(name)
+        return self._services[name]
 
     def connect(self, server, port, addrinfo, factory):
         for address in addrinfo:
@@ -113,13 +134,16 @@ class NanoBot(object, service.MultiService):
 
     def _rehash(self):
         log.msg("Beginning rehash")
-        for plugin in self:
+        _service = service
+        for plugin in list(self):
             plugin.disownServiceParent()
         for module_iter in exocet.getModule("plugins_enabled").iterModules():
             plugin_module = exocet.load(module_iter, exocet.pep302Mapper)
+            if 'BasePlugin' in dir(plugin_module):
+                continue
             for plugin_name in module_iter.iterExportNames():
                 plugin_class = getattr(plugin_module, plugin_name)
-                if issubclass(plugin_class, service.Service):
+                if issubclass(plugin_class, _service.Service):
                     plugin = plugin_class()
                     plugin.setServiceParent(self)
         log.msg("Finished rehash")
@@ -208,9 +232,11 @@ class NanoBot(object, service.MultiService):
                 pass
             else:
                 f(instance, *args, **kwargs)
-        
 
-if __name__ == '__main__':
+def main():
     log.startLogging(open("nanobot.log", "a"))
     bot = NanoBot("config.yaml")
     reactor.run()
+
+if __name__ == '__main__':
+    main()

@@ -61,7 +61,7 @@ class HTTPClient(object):
         scheme, netloc, path, _, query, _ = http.urlparse(url)
         url = urlunparse((scheme, netloc, path, '', query, ''))
         lock = self.cache[url]
-        d = lock.acquire()
+        yield lock.acquire()
         path = create_path(self.cache_path, url)
         if lock.timestamp is None or time.time() - lock.timestamp > 5*60:
             d = self.agent.request('GET', url,

@@ -67,7 +67,6 @@ class HTTPClient(object):
             d = self.agent.request('GET', url,
                                    http.Headers({'User-Agent': [self.version]}),
                                    None)
-            finish = defer.Deferred()
             d.addCallback(self._trigger_fetch, path, self.limit)
             yield d
             yield defer.returnValue(d.result)

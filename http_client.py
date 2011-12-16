@@ -12,9 +12,11 @@ class CacheItem(defer.DeferredLock):
         defer.DeferredLock.__init__(self)
         self.path = None
         self.timestamp = None
+        self.url = None
 
-    def update(self, path):
+    def update(self, path, url):
         self.path = path
+        self.url = url
         self.timestamp = time.time()
 
 class CachePrinter(protocol.Protocol):
@@ -44,6 +46,14 @@ def create_path(prefix, s):
     s = str(hash(s)).encode("base64").rstrip()
     return os.path.join(prefix, s)
 
+def valid_item(item, url):
+    if item.timestamp is None or time.time() - lock.timestamp > 5*60:
+        return False
+    elif item.url is None or item.url != url:
+        return False
+    else:
+        return True
+
 
 class HTTPClient(object):
     version = 'Nanobot'
@@ -63,22 +73,28 @@ class HTTPClient(object):
         lock = self.cache[url]
         yield lock.acquire()
         path = create_path(self.cache_path, url)
-        if lock.timestamp is None or time.time() - lock.timestamp > 5*60:
+        if not valid_item(lock, url):
             d = self.agent.request('GET', url,
                                    http.Headers({'User-Agent': [self.version]}),
                                    None)
-            d.addCallback(self._trigger_fetch, path, self.limit)
+            d.addCallback(self._trigger_fetch, path, self.limit, lock)
             yield d
             yield defer.returnValue(d.result)
+            lock.update(path, url)
+        else:
+            yield defer.returnValue(self._cache_fetch(None, path, lock))
 
 
-    def _trigger_fetch(self, result, path, limit):
+    def _trigger_fetch(self, result, path, limit, lock):
         d = defer.Deferred()
         result.deliverBody(CachePrinter(path, limit, d))
-        d.addCallback(self._cache_fetch, path)
+        d.addCallback(self._cache_fetch, path, lock)
         return d
 
-    def _cache_fetch(self, result, path):
+    def _cache_fetch(self, result, path, lock):
         with open(path) as f:
-            return f.read()
+            s = f.read()
+            lock.release()
+            return s
+        
 

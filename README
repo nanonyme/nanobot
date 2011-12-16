@@ -16,5 +16,5 @@ this isn't the case, please file a bug.
 
 Testing
 ---------
-nose recommended for running tests. Tests require mock and new unittest 
-library which is available for Python 2.6 as unittest2.
+Trial recommended for running tests since it comes with twisted. Some tests 
+require mock and all tests are expected to be written with twisted trial.

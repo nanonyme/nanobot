@@ -66,7 +66,9 @@ class HTTPClient(object):
         self.agent = client.Agent(reactor)
 
     @defer.inlineCallbacks
-    def fetch_url(self, url):
+    def fetch_url(self, url, limit=None):
+        if not limit:
+            limit = self.limit
         # Juggle around removing stuff from URL that we don't want
         scheme, netloc, path, _, query, _ = http.urlparse(url)
         url = urlunparse((scheme, netloc, path, '', query, ''))
@@ -77,7 +79,7 @@ class HTTPClient(object):
             d = self.agent.request('GET', url,
                                    http.Headers({'User-Agent': [self.version]}),
                                    None)
-            d.addCallback(self._trigger_fetch, path, self.limit, lock)
+            d.addCallback(self._trigger_fetch, path, limit, lock)
             yield d
             yield defer.returnValue(d.result)
             lock.update(path, url)

@@ -1,26 +1,25 @@
-import nanobot
 import http_client
-import unittest
-from twisted.internet import defer, reactor
+from twisted.trial import unittest
 import BeautifulSoup
-
-class ResultCollector(object):
-    def __init__(self):
-        self.content = None
-
-    def __call__(self, content):
-        self.content = content
-        reactor.stop()
-
 
 class TestHTTPClient(unittest.TestCase):
     def setUp(self):
         self.client = http_client.HTTPClient("cache")
-        self.collector = ResultCollector()
+
+    def title_check(self, result, title):
+        soup = BeautifulSoup.BeautifulSoup(result)
+        self.assertEqual(soup.title.string, title)
 
     def test_google(self):
         d = self.client.fetch_url("http://www.google.fi")
-        d.addBoth(self.collector)
-        reactor.run()
-        soup = BeautifulSoup.BeautifulSoup(self.collector.content)
-        self.assertEqual(str(soup.title).strip(), "<title>Google</title>")
+        d.addCallback(self.title_check, "Google")
+        return d
+
+    def length_check(self, result, length):
+        self.assertEqual(len(result), length)
+
+    def test_bad_site(self):
+        self.client.limit = 10
+        d = self.client.fetch_url("http://phreakocious.net/watchthemfall")
+        d.addBoth(self.length_check, 10)
+        return d

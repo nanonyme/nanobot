@@ -48,6 +48,7 @@ class SizeLimitedFile(object):
                 self.f.write(data[0:self.limit])
                 self.written = self.limit
             else:
+                self.f.flush()
                 raise IOError(self.written)
         else:
             self.f.write(data)

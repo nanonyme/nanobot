@@ -16,10 +16,10 @@ class TestHTTPClient(unittest.TestCase):
         return d
 
     def length_check(self, result, length):
-        self.assertEqual(len(result), length)
+        self.assertEqual(int(result.getErrorMessage()), length)
 
     def test_bad_site(self):
-        self.client.limit = 10
-        d = self.client.fetch_url("http://phreakocious.net/watchthemfall")
-        d.addBoth(self.length_check, 10)
-        return d
+       self.client.limit = 10
+       d = self.client.fetch_url("http://phreakocious.net/watchthemfall")
+       d.addBoth(self.length_check, 10)
+       return d

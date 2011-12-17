@@ -3,6 +3,7 @@ from twisted.internet import reactor, defer, protocol
 import os, time
 from collections import defaultdict
 from urlparse import urlunparse
+import StringIO
 
 class ConnectionAborted(object):
     pass
@@ -19,29 +20,6 @@ class CacheItem(defer.DeferredLock):
         self.url = url
         self.timestamp = time.time()
 
-class CachePrinter(protocol.Protocol):
-    def __init__(self, path, limit, finish):
-        self.path = path
-        self.f = open(self.path, "w")
-        self.limit = limit
-        self.finish = finish
-
-    def dataReceived(self, bytes):
-        len_bytes = len(bytes)
-        if self.limit - len_bytes >= 0:
-            self.f.write(bytes)
-            self.limit -= len_bytes
-        elif self.limit > 0:
-            self.f.write(bytes[:self.limit])
-            self.limit = 0
-        else:
-            raise ConnectionAborted("File size safety limit reached")
-
-    def connectionLost(self, reason):
-        self.f.close()
-        self.finish.callback(None)
-    
-
 def create_path(prefix, s):
     s = str(hash(s)).encode("base64").rstrip()
     return os.path.join(prefix, s)
@@ -53,6 +31,30 @@ def valid_item(item, url):
         return False
     else:
         return True
+
+
+class SizeLimitedFile(object):
+    def __init__(self, path, limit=None):
+        self.f = open(path, "w")
+        self.written = 0
+        self.limit = limit
+
+    def write(self, data):
+        if self.limit is not None:
+            if len(data) <= self.limit - self.written:
+                self.f.write(data)
+                self.written += len(data)
+            elif self.written != self.limit:
+                self.f.write(data[0:self.limit])
+                self.written = self.limit
+            else:
+                raise IOError(self.written)
+        else:
+            self.f.write(data)
+
+    def close(self):
+        if not self.f.closed:
+            self.f.close()
 
 
 class HTTPClient(object):
@@ -76,22 +78,16 @@ class HTTPClient(object):
         yield lock.acquire()
         path = create_path(self.cache_path, url)
         if not valid_item(lock, url):
-            d = self.agent.request('GET', url,
-                                   http.Headers({'User-Agent': [self.version]}),
-                                   None)
-            d.addCallback(self._trigger_fetch, path, limit, lock)
+            f = SizeLimitedFile(path, limit)
+            d = client.downloadPage(url, f,
+                                    headers={'User-Agent': [self.version]})
+            d.addCallback(self._cache_fetch, path, lock)
             yield d
             yield defer.returnValue(d.result)
             lock.update(path, url)
         else:
             yield defer.returnValue(self._cache_fetch(None, path, lock))
 
-
-    def _trigger_fetch(self, result, path, limit, lock):
-        d = defer.Deferred()
-        result.deliverBody(CachePrinter(path, limit, d))
-        d.addCallback(self._cache_fetch, path, lock)
-        return d
 
     def _cache_fetch(self, result, path, lock):
         with open(path) as f:

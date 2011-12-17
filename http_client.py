@@ -5,7 +5,7 @@ from collections import defaultdict
 from urlparse import urlunparse
 import StringIO
 
-class ConnectionAborted(object):
+class ConnectionAborted(IOError):
     pass
 
 class CacheItem(defer.DeferredLock):
@@ -49,7 +49,7 @@ class SizeLimitedFile(object):
                 self.written = self.limit
             else:
                 self.f.flush()
-                raise IOError(self.written)
+                raise ConnectionAborted(self.written)
         else:
             self.f.write(data)
 

@@ -15,11 +15,8 @@ class TestHTTPClient(unittest.TestCase):
         d.addCallback(self.title_check, "Google")
         return d
 
-    def length_check(self, result, length):
-        self.assertEqual(int(result.getErrorMessage()), length)
-
     def test_bad_site(self):
        self.client.limit = 10
        d = self.client.fetch_url("http://phreakocious.net/watchthemfall")
-       d.addBoth(self.length_check, 10)
+       d.addBoth(self.title_check, "Error, maximum download limit %d" % self.client.limit)
        return d

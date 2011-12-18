@@ -49,7 +49,7 @@ class SizeLimitedFile(object):
                 self.written = self.limit
             else:
                 self.f.flush()
-                raise ConnectionAborted(self.written)
+                raise ConnectionAborted("Error, maximum download limit %d" % self.limit)
         else:
             self.f.write(data)
 
@@ -82,15 +82,22 @@ class HTTPClient(object):
             f = SizeLimitedFile(path, limit)
             d = client.downloadPage(url, f,
                                     headers={'User-Agent': [self.version]})
-            d.addCallback(self._cache_fetch, path, lock)
+            d.addCallbacks(callback=self._cache_fetch,
+                           callbackArgs=(path, lock, d),
+                           errback=self._handle_error)
+            d.addCallback(lambda result : result)
             yield d
             yield defer.returnValue(d.result)
             lock.update(path, url)
         else:
             yield defer.returnValue(self._cache_fetch(None, path, lock))
 
+    
+    def _handle_error(self, result):
+        e = result.trap(ConnectionAborted)
+        return "<html><head><title>%s</title></head></html>" % result.getErrorMessage()
 
-    def _cache_fetch(self, result, path, lock):
+    def _cache_fetch(self, result, path, lock, d):
         with open(path) as f:
             s = f.read()
             lock.release()

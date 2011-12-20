@@ -89,7 +89,6 @@ class HTTPClient(object):
             dl.addCallbacks(callback=self._cache_fetch,
                             callbackArgs=(path, lock, d),
                             errback=self._handle_error)
-            dl.addCallback(lambda result : result)
             dl.chainDeferred(d)
             lock.update(path, url)
         else:

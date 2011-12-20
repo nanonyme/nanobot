@@ -68,7 +68,6 @@ class HTTPClient(object):
         self.cache = defaultdict(CacheItem)
         self.agent = client.Agent(reactor)
 
-    @defer.inlineCallbacks
     def fetch_url(self, url, limit=None):
         if not limit:
             limit = self.limit
@@ -76,23 +75,26 @@ class HTTPClient(object):
         scheme, netloc, path, _, query, _ = http.urlparse(url)
         url = urlunparse((scheme, netloc, path, '', query, ''))
         lock = self.cache[url]
-        yield lock.acquire()
+        l = lock.acquire()
+        d = defer.Deferred()
         path = create_path(self.cache_path, url)
+        l.addCallback(self._start_download, url, path, limit, d)
+        return d
+
+    def _start_download(self, lock, url, path, limit, d):
         if not valid_item(lock, url):
             f = SizeLimitedFile(path, limit)
-            d = client.downloadPage(url, f,
+            dl = client.downloadPage(url, f,
                                     headers={'User-Agent': [self.version]})
-            d.addCallbacks(callback=self._cache_fetch,
-                           callbackArgs=(path, lock, d),
-                           errback=self._handle_error)
-            d.addCallback(lambda result : result)
-            yield d
-            yield defer.returnValue(d.result)
+            dl.addCallbacks(callback=self._cache_fetch,
+                            callbackArgs=(path, lock, d),
+                            errback=self._handle_error)
+            dl.addCallback(lambda result : result)
+            dl.chainDeferred(d)
             lock.update(path, url)
         else:
-            yield defer.returnValue(self._cache_fetch(None, path, lock))
+           d.callback(self._cache_fetch(None, path, lock))
 
-    
     def _handle_error(self, result):
         e = result.trap(ConnectionAborted)
         return "<html><head><title>%s</title></head></html>" % result.getErrorMessage()

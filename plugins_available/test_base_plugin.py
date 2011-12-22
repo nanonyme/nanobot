@@ -1,34 +1,36 @@
 from twisted.trial import unittest
 from twisted.internet import defer, reactor
-import base_plugin
+from base_plugin import BasePlugin, plugin_method, PluginMethod
 
-class Normal(base_plugin.BasePlugin):
+class Normal(BasePlugin):
+    @plugin_method
     def test_method(self):
         pass
 
-class SecondNormal(base_plugin.BasePlugin):
-    def test_method(self):
-        pass
-
-
-class High(base_plugin.BasePlugin):
-    @base_plugin.PluginWrapper("high")
-    def test_method(self):
-        pass
-
-class SecondHigh(base_plugin.BasePlugin):
-    @base_plugin.PluginWrapper("high")
+class SecondNormal(BasePlugin):
+    @plugin_method
     def test_method(self):
         pass
 
 
-class Low(base_plugin.BasePlugin):
-    @base_plugin.PluginWrapper("low")
+class High(BasePlugin):
+    @plugin_method("high")
     def test_method(self):
         pass
 
-class SecondLow(base_plugin.BasePlugin):
-    @base_plugin.PluginWrapper("low")
+class SecondHigh(BasePlugin):
+    @plugin_method("high")
+    def test_method(self):
+        pass
+
+
+class Low(BasePlugin):
+    @plugin_method("low")
+    def test_method(self):
+        pass
+
+class SecondLow(BasePlugin):
+    @plugin_method("low")
     def test_method(self):
         pass
 
@@ -43,8 +45,7 @@ def passthrough():
 
 class TestInvalidPriority(unittest.TestCase):
     def test_invalid_priority(self):
-        w = base_plugin.PluginWrapper("foo")
-        self.assertRaises(ValueError, w, passthrough)
+        self.assertRaises(ValueError, PluginMethod, passthrough, "foo")
 
 class TestHighAndLow(unittest.TestCase):
     def setUp(self):

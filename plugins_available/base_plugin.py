@@ -2,26 +2,21 @@ from twisted.application import service
 from functools import wraps
 
 class BasePlugin(object, service.Service):
-    def __init__(self):
-        for key in dir(self):
-            if key.startswith("__") and key.endswith("__"):
-                continue
-            item = getattr(self, key)
-            if isinstance(item, PluginMethod):
-                continue
-            setattr(self, key, PluginMethod(item, 'normal'))
+    pass
 
-class PluginWrapper(object):
-    def __init__(self, priority='normal'):
-        self.priority = priority
-        super(PluginWrapper, self).__init__()
+def plugin_method(arg=None):
+    if callable(arg):
+        return PluginMethod(function=arg)
+    def wrapper(function):
+        if arg is not None:
+            return PluginMethod(function=function, priority=arg)
+        else:
+            return PluginMethod(function=function)
+    return wrapper
 
-    def __call__(self, function):
-        return PluginMethod(function, self.priority)
-
-class  PluginMethod(object):
+class PluginMethod(object):
     priority_mapping = {'high':0, 'normal':1, 'low':2}
-    def __init__(self, function, priority):
+    def __init__(self, function, priority='normal'):
         if priority not in self.priority_mapping:
             raise ValueError("%s is not an accepted priority" % priority)
         self.function = function

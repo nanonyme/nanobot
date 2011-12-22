@@ -2,7 +2,25 @@ from twisted.application import service
 from functools import wraps
 
 class BasePlugin(object, service.Service):
-    pass
+    def setServiceParent(self, parent):
+        try:
+            setUp = getattr(self, 'setUp')
+        except AttributeError:
+            pass
+        else:
+            if callable(setUp):
+                setUp()
+        return service.Service.setServiceParent(self, parent)
+        
+    def disownServiceParent(self):
+        try:
+            tearDown = getattr(self, 'tearDown')
+        except AttributeError:
+            pass
+        else:
+            if callable(tearDown):
+                tearDown()
+        return service.Service.disownServiceParent(self)
 
 def plugin_method(arg=None):
     if callable(arg):

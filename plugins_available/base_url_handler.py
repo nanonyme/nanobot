@@ -1,11 +1,13 @@
 from twisted.application import service
-from twisted.internet import reactor
+from twisted.internet import reactor, defer
 import urlparse, urllib
 import BeautifulSoup
+from base_plugin import BasePlugin, plugin_method
 
-class URLFinder(object, service.Service):
+class URLFinder(BasePlugin):
     schemes = ['http://', 'https://']
-    def privmsg(self, instance, user, channel, message):
+    @plugin_method
+    def privmsg(self, message, user, channel):
         for scheme in self.schemes:
             try:
                 start = message.index(scheme)
@@ -23,12 +25,11 @@ class URLFinder(object, service.Service):
                 start = end
             host, _, tld = host.rpartition('.')
             subdomain, _, domain = host.rpartition('.')
-            reactor.callLater(0, self.parent.delegate, instance,
-                              'handle_url', user, channel, url)
+            reactor.callLater(0, self.parent.dispatch, 'handle_url', url)
 
-class GenericHandler(service.Service):
-    def handle_url(self, instance, user, channel, url):
-        soup = BeautifulSoup.BeautifulSoup(self.parent.fetch_url(url))
-        message = 'title: %s' % soup.title.string
-        self.parent.reply(instance, user, channel, message, direct=False)
+class GenericHandler(BasePlugin):
+    @plugin_method("low")
+    def handle_url(self, url):
+        result  = defer.waitForDeferred(self.parent.fetch_url(url))
+        return result
 

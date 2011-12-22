@@ -1,5 +1,6 @@
 from twisted.application import service
 from functools import wraps
+import types
 
 class BasePlugin(object, service.Service):
     def setServiceParent(self, parent):
@@ -48,6 +49,9 @@ class PluginMethod(object):
     def __call__(self, *args, **kwargs):
         return self.function(*args, **kwargs)
 
+    def __get__(self, obj, objtype=None):
+         "Simulate func_descr_get() in Objects/funcobject.c"
+         return types.MethodType(self, obj, objtype)
 
     def __lt__(self, other):
         if self.num_priority < other.num_priority:

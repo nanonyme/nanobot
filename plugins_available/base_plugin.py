@@ -33,6 +33,16 @@ def plugin_method(arg=None):
             return PluginMethod(function=function)
     return wrapper
 
+def order_plugin_methods(method1, method2):
+    priority1 = PluginMethod.priority_mapping[method1.priority]
+    priority2 = PluginMethod.priority_mapping[method2.priority]
+    if priority1 < priority2:
+        return -1
+    elif priority1 > priority2:
+        return 1
+    return cmp(id(method1), id(method2))
+
+
 class PluginMethod(object):
     priority_mapping = {'high':0, 'normal':1, 'low':2}
     def __init__(self, function, priority='normal'):
@@ -42,40 +52,10 @@ class PluginMethod(object):
         self.priority = priority
         super(PluginMethod, self).__init__()
         
-    @property
-    def num_priority(self):
-        return self.priority_mapping[self.priority]
-
     def __call__(self, *args, **kwargs):
         return self.function(*args, **kwargs)
 
     def __get__(self, obj, objtype=None):
          "Simulate func_descr_get() in Objects/funcobject.c"
          return types.MethodType(self, obj, objtype)
-
-    def __lt__(self, other):
-        if self.num_priority < other.num_priority:
-            return True
-        return False
-
-    def __eq__(self, other):
-        if self.num_priority != other.num_priority:
-            return False
-        if str(self) != str(other):
-            return False
-        return True
-
-    def __gt__(self, other):
-        if self.num_priority > other.num_priority:
-            return True
-        return False
-
-    def __le__(self, other):
-        return self.__lt__(other) or self.__eq__(other)
-
-    def __ge__(self, other):
-        return self.__gt__(other) or self.__eq__(other)
-
-
-
 

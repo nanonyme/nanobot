@@ -1,345 +1,86 @@
 from twisted.trial import unittest
 from twisted.internet import defer, reactor
-from base_plugin import BasePlugin, plugin_method, PluginMethod
+from base_plugin import BasePlugin, plugin_method, PluginMethod, order_plugin_methods
 
 class Normal(BasePlugin):
     @plugin_method
     def test_method(self):
         pass
 
-class SecondNormal(BasePlugin):
-    @plugin_method
-    def test_method(self):
-        pass
-
-
 class High(BasePlugin):
     @plugin_method("high")
     def test_method(self):
         pass
-
-class SecondHigh(BasePlugin):
-    @plugin_method("high")
-    def test_method(self):
-        pass
-
 
 class Low(BasePlugin):
     @plugin_method("low")
     def test_method(self):
         pass
 
-class SecondLow(BasePlugin):
-    @plugin_method("low")
-    def test_method(self):
-        pass
-
-def delayed_test(func, cmp, a, b):
-    d = defer.Deferred()
-    d.addCallback(func)
-    reactor.callLater(0, d.callback, cmp(a, b))
-    return d
-
-def passthrough():
-    pass
-
 class TestInvalidPriority(unittest.TestCase):
     def test_invalid_priority(self):
-        self.assertRaises(ValueError, PluginMethod, passthrough, "foo")
+        self.assertRaises(ValueError, PluginMethod, (lambda x:x), "foo")
 
 class TestHighAndLow(unittest.TestCase):
     def setUp(self):
         self.high_method = High().test_method
         self.low_method = Low().test_method
 
-    def test_high_lt_low(self):
-        return delayed_test(self.assertTrue, lambda a, b : a < b,
-                            self.high_method, self.low_method)
+    def test_ordering_high_first(self):
+        self.assertEqual(order_plugin_methods(self.high_method, self.low_method), -1,
+                         "high should be before low")
 
-    def test_high_le_low(self):
-        return delayed_test(self.assertTrue, lambda a, b : a <= b,
-                            self.high_method, self.low_method)
 
-    def test_not_low_lt_high(self):
-        return delayed_test(self.assertFalse, lambda a, b : a < b,
-                            self.low_method, self.high_method)
-
-    def test_not_low_le_high(self):
-        return delayed_test(self.assertFalse, lambda a, b : a <= b,
-                            self.low_method, self.high_method)
-
-    def test_low_gt_high(self):
-        return delayed_test(self.assertTrue, lambda a, b : a > b,
-                            self.low_method, self.high_method)
-
-    def test_low_ge_high(self):
-        return delayed_test(self.assertTrue, lambda a, b : a >= b,
-                            self.low_method, self.high_method)
-
-    def test_not_high_gt_low(self):
-        return delayed_test(self.assertFalse, lambda a, b : a > b,
-                            self.high_method, self.low_method)
-
-    def test_not_high_ge_low(self):
-        return delayed_test(self.assertFalse, lambda a, b : a >= b,
-                            self.high_method, self.low_method)
-
-    def test_low_ne_high(self):
-        return delayed_test(self.assertTrue, lambda a, b : a != b,
-                            self.low_method, self.high_method)
-
-    def test_high_ne_low(self):
-        return delayed_test(self.assertTrue, lambda a, b : a != b,
-                            self.high_method, self.low_method)
-
-    def test_not_low_eq_high(self):
-        return delayed_test(self.assertFalse, lambda a, b : a == b,
-                            self.low_method, self.high_method)
-
-    def test_not_high_eq_low(self):
-        return delayed_test(self.assertFalse, lambda a, b : a == b,
-                            self.high_method, self.low_method)
+    def test_ordering_low_first(self):
+        self.assertEqual(order_plugin_methods(self.low_method, self.high_method), 1,
+                         "high should be before low")
 
 class TestHighAndNormal(unittest.TestCase):
     def setUp(self):
         self.high_method = High().test_method
         self.normal_method = Normal().test_method
+        
 
-    def test_high_lt_normal(self):
-        return delayed_test(self.assertTrue, lambda a, b : a < b,
-                            self.high_method, self.normal_method)
+    def test_ordering_high_first(self):
+        self.assertEqual(order_plugin_methods(self.high_method, self.normal_method), -1,
+                         "high should be before normal")
 
-    def test_high_le_normal(self):
-        return delayed_test(self.assertTrue, lambda a, b : a <= b,
-                            self.high_method, self.normal_method)
+    def test_ordering_normal_first(self):
+        self.assertEqual(order_plugin_methods(self.normal_method, self.high_method), 1,
+                         "high should be before normal")
 
-    def test_not_normal_lt_high(self):
-        return delayed_test(self.assertFalse, lambda a, b : a < b,
-                            self.normal_method, self.high_method)
-
-    def test_not_normal_le_high(self):
-        return delayed_test(self.assertFalse, lambda a, b : a <= b,
-                            self.normal_method, self.high_method)
-
-    def test_normal_gt_high(self):
-        return delayed_test(self.assertTrue, lambda a, b : a > b,
-                            self.normal_method, self.high_method)
-
-    def test_normal_ge_high(self):
-        return delayed_test(self.assertTrue, lambda a, b : a >= b,
-                            self.normal_method, self.high_method)
-
-    def test_not_high_gt_normal(self):
-        return delayed_test(self.assertFalse, lambda a, b : a > b,
-                            self.high_method, self.normal_method)
-
-    def test_not_high_ge_normal(self):
-        return delayed_test(self.assertFalse, lambda a, b : a >= b,
-                            self.high_method, self.normal_method)
-
-    def test_normal_ne_high(self):
-        return delayed_test(self.assertTrue, lambda a, b : a != b,
-                            self.normal_method, self.high_method)
-
-    def test_high_ne_normal(self):
-        return delayed_test(self.assertTrue, lambda a, b : a != b,
-                            self.high_method, self.normal_method)
-
-    def test_not_normal_eq_high(self):
-        return delayed_test(self.assertFalse, lambda a, b : a == b,
-                            self.normal_method, self.high_method)
-
-    def test_not_high_eq_normal(self):
-        return delayed_test(self.assertFalse, lambda a, b : a == b,
-                            self.high_method, self.normal_method)
-
-class TestNormalAndLow(unittest.TestCase):
+class TestNormalLow(unittest.TestCase):
     def setUp(self):
         self.normal_method = Normal().test_method
         self.low_method = Low().test_method
 
-    def test_normal_lt_low(self):
-        return delayed_test(self.assertTrue, lambda a, b : a < b,
-                            self.normal_method, self.low_method)
+    def test_ordering_normal_first(self):
+        self.assertEqual(order_plugin_methods(self.normal_method, self.low_method), -1,
+                         "normal should be before low")
 
-    def test_normal_le_low(self):
-        return delayed_test(self.assertTrue, lambda a, b : a <= b,
-                            self.normal_method, self.low_method)
-
-    def test_not_low_lt_normal(self):
-        return delayed_test(self.assertFalse, lambda a, b : a < b,
-                            self.low_method, self.normal_method)
-
-    def test_not_low_le_normal(self):
-        return delayed_test(self.assertFalse, lambda a, b : a <= b,
-                            self.low_method, self.normal_method)
-
-    def test_low_gt_normal(self):
-        return delayed_test(self.assertTrue, lambda a, b : a > b,
-                            self.low_method, self.normal_method)
-
-    def test_low_ge_normal(self):
-        return delayed_test(self.assertTrue, lambda a, b : a >= b,
-                            self.low_method, self.normal_method)
-
-    def test_not_normal_gt_low(self):
-        return delayed_test(self.assertFalse, lambda a, b : a > b,
-                            self.normal_method, self.low_method)
-
-    def test_not_normal_ge_low(self):
-        return delayed_test(self.assertFalse, lambda a, b : a >= b,
-                            self.normal_method, self.low_method)
-
-    def test_low_ne_normal(self):
-        return delayed_test(self.assertTrue, lambda a, b : a != b,
-                            self.low_method, self.normal_method)
-
-    def test_normal_ne_low(self):
-        return delayed_test(self.assertTrue, lambda a, b : a != b,
-                            self.normal_method, self.low_method)
-
-    def test_not_low_eq_normal(self):
-        return delayed_test(self.assertFalse, lambda a, b : a == b,
-                            self.low_method, self.normal_method)
-
-    def test_not_normal_eq_low(self):
-        return delayed_test(self.assertFalse, lambda a, b : a == b,
-                            self.normal_method, self.low_method)
+    def test_ordering_low_first(self):
+        self.assertEqual(order_plugin_methods(self.low_method, self.normal_method), 1,
+                         "normal should be before low")
 
 
-class Foo:
+class TestTwoSame(unittest.TestCase):
+    def test_two_high(self):
+        self.validate(High().test_method, High().test_method)
 
-    def test_normal_lt_low(self):
-        reactor.callLater(0, self.d.callback,
-                          self.normal.test_method < self.low.test_method)
-        return self.d
+    def test_two_normal(self):
+        self.validate(Normal().test_method, Normal().test_method)
 
-    def test_normal_le_low(self):
-        reactor.callLater(0, self.d.callback,
-                          self.normal.test_method <= self.low.test_method)
-        return self.d
+    def test_two_low(self):
+        self.validate(Low().test_method, Low().test_method)
 
-    def test_low_lt_low(self):
-        reactor.callLater(0, self.d.callback,
-                          self.low.test_method < self.low.test_method)
-        return self.d
-
-    def test_low_le_low(self):
-        reactor.callLater(0, self.d.callback,
-                          self.low.test_method < self.low.test_method)
-        return self.d
-
-
-    def test_low_gt_normal(self):
-        reactor.callLater(0, self.d.callback,
-                          self.low.test_method > self.normal.test_method)
-        return self.d
-
-    def test_low_ge_normal(self):
-        reactor.callLater(0, self.d.callback,
-                          self.low.test_method >= self.normal.test_method)
-        return self.d
-
-    def test_low_gt_normal(self):
-        reactor.callLater(0, self.d.callback,
-                          self.low.test_method > self.normal.test_method)
-        return self.d
-
-
-    def test_low_gt_low(self):
-        reactor.callLater(0, self.d.callback,
-                          self.low.test_method > self.low.test_method)
-        return self.d
-
-    def test_low_ge_low(self):
-        reactor.callLater(0, self.d.callback,
-                          self.low.test_method >= self.low.test_method)
-        return self.d
-
-    def test_normal_ne_low(self):
-        reactor.callLater(0, self.d.callback,
-                          self.normal.test_method != self.low.test_method)
-        return self.d
-
-    def test_low_ne_normal(self):
-        reactor.callLater(0, self.d.callback,
-                          self.low.test_method != self.normal.test_method)
-        return self.d
-
-
-    def test_low_ne_low(self):
-        reactor.callLater(0, self.d.callback,
-                          self.low.test_method != self.low.test_method)
-        return self.d
-
-    def test_low_ne_low(self):
-        reactor.callLater(0, self.d.callback,
-                          self.low.test_method != self.low.test_method)
-        return self.d
-
-
-class TestNormalEqualities(unittest.TestCase):
-    def setUp(self):
-
-        self.first_method = Normal().test_method
-        self.second_method = SecondNormal().test_method
-        self.d = defer.Deferred()
-
-    def test_first_normal_eq_second_normal_false(self):
-        self.d.addCallback(self.assertFalse)
-        reactor.callLater(0, self.d.callback,
-                          self.first_method == self.second_method)
-        return self.d
-
-    def test_second_normal_eq_first_normal_false(self):
-        self.d.addCallback(self.assertFalse)
-        reactor.callLater(0, self.d.callback,
-                          self.second_method == self.first_method)
-        return self.d
-
-
-    def test_first_normal_eq_first_normal(self):
-        self.d.addCallback(self.assertTrue)
-        reactor.callLater(0, self.d.callback,
-                          self.first_method == self.first_method)
-        return self.d
-
-    def test_second_normal_eq_second_normal(self):
-        self.d.addCallback(self.assertTrue)
-        reactor.callLater(0, self.d.callback,
-                          self.second_method == self.second_method)
-        return self.d
-
-
-class TestHighEqualities(unittest.TestCase):
-    def setUp(self):
-
-        self.first_method = High().test_method
-        self.second_method = SecondHigh().test_method
-        self.d = defer.Deferred()
-
-    def test_first_low_eq_second_low_false(self):
-        self.d.addCallback(self.assertFalse)
-        reactor.callLater(0, self.d.callback,
-                          self.first_method == self.second_method)
-        return self.d
-
-    def test_second_low_eq_first_low_false(self):
-        self.d.addCallback(self.assertFalse)
-        reactor.callLater(0, self.d.callback,
-                          self.second_method == self.first_method)
-        return self.d
-
-    
-    def test_first_low_eq_first_low(self):
-        self.d.addCallback(self.assertTrue)
-        reactor.callLater(0, self.d.callback,
-                          self.first_method == self.first_method)
-        return self.d
-
-    def test_second_low_eq_second_low(self):
-        self.d.addCallback(self.assertTrue)
-        reactor.callLater(0, self.d.callback,
-                          self.second_method == self.second_method)
-        return self.d
-                                                                                                                                
+    def validate(self, first, second):
+        if id(first) < id(second):
+            self.assertEqual(order_plugin_methods(first, second), -1,
+                             "sorting by id() failed")
+            self.assertEqual(order_plugin_methods(second, first), 1,
+                             "sorting by id() failed")
+        else:
+            self.assertEqual(order_plugin_methods(first, second), 1,
+                             "sorting by id() failed")
+            self.assertEqual(order_plugin_methods(second, first), -1,
+                             "sorting by id() failed")

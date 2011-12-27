@@ -6,7 +6,8 @@ from twisted.python import modules
 from twisted.internet import defer
 from twisted.python import log
 from twisted.python import rebuild
-plugins = modules.getModule('plugins_enabled')
+import yaml
+plugins = modules.getModule('plugins')
 def plugin_method(priority):
     def wrapper(function):
         return(plugins.load().PluginMethod(function=function,
@@ -18,6 +19,7 @@ class Dispatcher(object):
     def __init__(self):
         self.cache = http_client.HTTPClient("cache")
         self._services = dict()
+        self._config = dict()
         self._rehash()
     
     def addService(self, s):
@@ -47,11 +49,16 @@ class Dispatcher(object):
         _service = service
         for plugin in list(self):
             plugin.disownServiceParent()
+        with open('config.yaml') as f:
+            self._config['plugins'] = yaml.load(f).get('plugins', [])
         rebuild.updateInstance(self.cache)
         rebuild.updateInstance(self)
         BasePlugin = plugins.load().BasePlugin
         for iterator in plugins.walkModules():
             plugin_module = iterator.load()
+            prefix, _, name = plugin_module.__name__.partition('.')
+            if name not in self._config['plugins']:
+                continue
             for plugin_name in dir(plugin_module):
                 plugin_class = getattr(plugin_module, plugin_name)
                 if plugin_class is BasePlugin:

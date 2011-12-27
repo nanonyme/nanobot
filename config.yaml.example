@@ -7,3 +7,6 @@ networks:
    port: 6667
    channels:
       - name: "#mytestchannel"
+
+plugins:
+ - base_url_handler

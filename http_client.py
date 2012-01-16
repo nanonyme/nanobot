@@ -34,8 +34,8 @@ def valid_item(item, url):
 
 
 class SizeLimitedFile(object):
-    def __init__(self, path, limit=None):
-        self.f = open(path, "w")
+    def __init__(self, f, limit=None):
+        self.f = f
         self.written = 0
         self.limit = limit
 
@@ -44,11 +44,10 @@ class SizeLimitedFile(object):
             if len(data) <= self.limit - self.written:
                 self.f.write(data)
                 self.written += len(data)
-            elif self.written != self.limit:
+            elif self.written == self.limit:
                 self.f.write(data[0:self.limit])
                 self.written = self.limit
             else:
-                self.f.flush()
                 raise ConnectionAborted("Error, maximum download limit %d" % self.limit)
         else:
             self.f.write(data)
@@ -83,7 +82,7 @@ class HTTPClient(object):
 
     def _start_download(self, lock, url, path, limit, d):
         if not valid_item(lock, url):
-            f = SizeLimitedFile(path, limit)
+            f = SizeLimitedFile(open(path, "w"), limit)
             dl = client.downloadPage(url, f,
                                     headers={'User-Agent': [self.version]})
             dl.addCallbacks(callback=self._cache_fetch,

@@ -34,20 +34,12 @@ class NanoBotProtocol(object, irc.IRCClient):
     def privmsg(self, user, channel, message):
         irc.IRCClient.privmsg(self, user, channel, message)
         self.bot.dispatcher('privmsg', user=user, channel=channel,
-                                    message=message, protocol=protocol)
-
-    def noticed(self, user, channel, message):
-        irc.IRCClient.privmsg(self, user, channel, message)
-        self.bot.dispatcher("noticed", user=user, channel=channel,
-                                    message=message, protocol=protocol)
+                                    message=message, protocol=self)
 
     def reply(self, message, target):
         if 'unicode' in str(type(message)):
-            encoding = self.factory.config['core'].get('encoding', 'utf-8')
-            message = message.encode(encoding)
-            target = None
-            self.msg(target, message)
-            raise StopIteration()
+            message = message.encode(self.server.encoding)
+        self.msg(target, message)
 
 class ServerConnection(protocol.ReconnectingClientFactory):
     protocol = NanoBotProtocol
@@ -83,6 +75,10 @@ class ServerConnection(protocol.ReconnectingClientFactory):
     @property
     def is_ssl(self):
         return bool(self.network_config.get('ssl', False))
+
+    @property
+    def encoding(self):
+        return self.network_config.get('encoding', 'utf-8')
 
     def connect(self):
         if self.is_ssl:

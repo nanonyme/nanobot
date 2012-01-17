@@ -8,8 +8,7 @@ Installing
 ----------
 Highly recommended twisted from svn 
 (svn://svn.twistedmatrix.com/svn/Twisted/trunk), it's more stable 
-than the release versions when this was written. exocet is available from 
-https://launchpad.net/exocet.
+than the release versions when this was written.
 
 Plugins documentation must clearly tell additional requirements. If you feel 
 this isn't the case, please file a bug.

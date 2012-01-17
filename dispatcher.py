@@ -8,6 +8,7 @@ from twisted.python import log
 from twisted.python import rebuild
 import yaml
 from collections import defaultdict
+import re
 
 plugins = modules.getModule('plugins')
 def plugin_method(priority):
@@ -19,8 +20,8 @@ def plugin_method(priority):
 class Dispatcher(object):
     implements(service.IServiceCollection)
     def __init__(self, reactor, bot):
-        self._reactor = reactor
-        self._bot = bot
+        self.reactor = reactor
+        self.bot = bot
         self.cache = http_client.HTTPClient("cache")
         self._services = dict()
         self._config = dict()
@@ -46,8 +47,8 @@ class Dispatcher(object):
         return self._services[name]
 
     @plugin_method('high')
-    def cmd_rehash(self, command, parameters, user, channel):
-        return self._rehash()
+    def cmd_rehash(self, parameters, user, channel, d):
+        return d.callback(self._rehash())
 
     def _rehash(self):
         log.msg("Beginning rehash")
@@ -73,46 +74,67 @@ class Dispatcher(object):
                         plugin_class().setServiceParent(self)
                 except TypeError:
                     continue
-        return "Succesfully rehashed"
+        log.msg("Rehash done")
+        return "Rehashed"
 
-    @defer.inlineCallbacks
     def __call__(self, result, **kwargs):
+        _plugins = plugins.load()
         try:
             plugin_method = getattr(self, result)
         except AttributeError:
             pass
         else:
-            if plugin_method is PluginMethod:
-                yield defer.maybeDeferred(plugin_method(**kwargs))
-        for plugin_method in sorted(self.command_table,
-                                    cmp=plugins.compare_plugin_methods):
-            yield defer.maybeDeferred(plugin_method(**kwargs))
+            d = plugin_method(**kwargs)
+            if d is not None:
+                return d
+        plugin_methods = []
+        for plugin_class in self:
+            try:
+                plugin_method = getattr(plugin_class, result)
+            except AttributeError:
+                pass
+            else:
+                plugin_methods.append(plugin_method)
+        for plugin_method in sorted(plugin_methods,
+                                    cmp=_plugins.order_plugin_methods):
+            d = plugin_method(**kwargs)
+            if d is not None:
+                return d
 
 
-    def privmsg(self, user, channel, message, d=None):
+    def privmsg(self, user, channel, message, protocol):
         cmd = False
-        if message.startswith(context['nickname']):
+        prefix = ""
+        if channel == protocol.nickname:
+            target, _, _ = user.partition("!")
+        else:
+            target = channel
+            prefix, _, _ = user.partition("!")
+        d = defer.Deferred()
+        d.addCallback((lambda message, prefix: "%s, %s" % (prefix, message)), prefix)
+        d.addCallback(protocol.reply, target)
+        if message.startswith(protocol.nickname):
             cmd = True
-            pattern = r'(%s[^\w]+)' % context['nickname']
+            pattern = r'(%s[^\w]+)' % protocol.nickname
             message = re.sub(pattern, '', message)
-            if cmd or context['channel'] == instance.nickname:
-                admins = self.config['core'].get('admins', None)
+            if cmd or channel == instance.nickname:
+                admins = self.bot.core_config.get('admins', [])
                 is_admin = False
-                if not admins:
-                    return d.callback({'message': "I'm free, I've no masters",
-                                       'command': True})
+                if len(admins) == 0:
+                    self.reactor.callLater(0, d.callback, "I have no masters")
+                    return d
                 for admin in admins:
+                    admin = admin.replace(".", "\.")
+                    admin = admin.replace("*", ".*")
                     if re.match(admin, user):
                         is_admin = True
                         break
             if not is_admin:
-                return d.callback({'message':'You are not an admin',
-                                   'command':True})
+                self.reactor.callLater(0, d.callback, 'You are not an admin')
+                return d
+            ret = defer.Deferred()
             message = message.lower()
             command, _, parameters = message.partition(" ")
-            ret = defer.Deferred()
-            message = "cmd_" + command
-            ret.addCallback((lambda result, message: message), message)
-            #ret.addCallback(self.dispatch, user,
-            self.delegate(instance, "cmd_" + command, user, channel,
-                          parameters)
+            ret.addCallback(self, parameters=parameters, user=user, channel=channel, d=d)
+            self.reactor.callLater(0, ret.callback, "cmd_" + command)
+            return ret

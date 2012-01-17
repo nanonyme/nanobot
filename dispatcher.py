@@ -7,6 +7,8 @@ from twisted.internet import defer
 from twisted.python import log
 from twisted.python import rebuild
 import yaml
+from collections import defaultdict
+
 plugins = modules.getModule('plugins')
 def plugin_method(priority):
     def wrapper(function):
@@ -16,11 +18,14 @@ def plugin_method(priority):
 
 class Dispatcher(object):
     implements(service.IServiceCollection)
-    def __init__(self):
+    def __init__(self, reactor, bot):
+        self._reactor = reactor
+        self._bot = bot
         self.cache = http_client.HTTPClient("cache")
         self._services = dict()
         self._config = dict()
         self._rehash()
+        self.command_table = defaultdict(set)
     
     def addService(self, s):
         if str(s) in self._services:
@@ -72,22 +77,42 @@ class Dispatcher(object):
 
     @defer.inlineCallbacks
     def __call__(self, result, **kwargs):
-        pass
         try:
             plugin_method = getattr(self, result)
         except AttributeError:
             pass
         else:
             if plugin_method is PluginMethod:
-                yield plugin_method(**kwargs)
-        for plugin in self:
-            try:
-                plugin_method = getattr(plugin, result)
-            except AttributeError:
-                pass
-            else:
-                if plugin_method is PluginMethod:
-                    yield plugin_method(**kwargs)
+                yield defer.maybeDeferred(plugin_method(**kwargs))
+        for plugin_method in sorted(self.command_table,
+                                    cmp=plugins.compare_plugin_methods):
+            yield defer.maybeDeferred(plugin_method(**kwargs))
 
 
-
+    def privmsg(self, user, channel, message, d=None):
+        cmd = False
+        if message.startswith(context['nickname']):
+            cmd = True
+            pattern = r'(%s[^\w]+)' % context['nickname']
+            message = re.sub(pattern, '', message)
+            if cmd or context['channel'] == instance.nickname:
+                admins = self.config['core'].get('admins', None)
+                is_admin = False
+                if not admins:
+                    return d.callback({'message': "I'm free, I've no masters",
+                                       'command': True})
+                for admin in admins:
+                    if re.match(admin, user):
+                        is_admin = True
+                        break
+            if not is_admin:
+                return d.callback({'message':'You are not an admin',
+                                   'command':True})
+            message = message.lower()
+            command, _, parameters = message.partition(" ")
+            ret = defer.Deferred()
+            message = "cmd_" + command
+            ret.addCallback((lambda result, message: message), message)
+            #ret.addCallback(self.dispatch, user,
+            self.delegate(instance, "cmd_" + command, user, channel,
+                          parameters)

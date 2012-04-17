@@ -41,6 +41,13 @@ class NanoBotProtocol(object, irc.IRCClient):
             message = message.encode(self.server.encoding)
         self.msg(target, message)
 
+    def serialize(self):
+        return {'nickname':self.nickname,
+                'realname':self.realname,
+                'server_name':self.server.name,
+                'encoding':self.server.encoding}
+
+
 class ServerConnection(protocol.ReconnectingClientFactory):
     protocol = NanoBotProtocol
     def __init__(self, reactor, network_config, bot):

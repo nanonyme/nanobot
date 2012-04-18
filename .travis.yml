@@ -2,7 +2,9 @@ python:
     - "2.6"
     - "2.7"
     - "pypy"
-before_install: sudo apt-get install libssl-dev -y
+before_install: 
+   - sudo pip install pyflakes
+   - find . -name '*.py' |xargs pyflakes
+   - sudo apt-get install libssl-dev -y
 install: sudo pip install -r requirements.txt --use-mirrors
-script: find . -name '*.py' |xargs pyflakes
 script: trial tests.py plugins

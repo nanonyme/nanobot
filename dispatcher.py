@@ -1,4 +1,3 @@
-import twisted.python
 import http_client
 from zope.interface import implements
 from twisted.application import service
@@ -52,7 +51,6 @@ class Dispatcher(object):
 
     def _rehash(self):
         log.msg("Beginning rehash")
-        _service = service
         for plugin in list(self):
             plugin.disownServiceParent()
         with open('config.yaml') as f:
@@ -117,7 +115,7 @@ class Dispatcher(object):
             cmd = True
             pattern = r'(%s[^\w]+)' % protocol.nickname
             message = re.sub(pattern, '', message)
-            if cmd or channel == instance.nickname:
+            if cmd or channel == protocol.nickname:
                 admins = self.bot.core_config.get('admins', [])
                 is_admin = False
                 if len(admins) == 0:

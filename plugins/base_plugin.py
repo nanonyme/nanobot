@@ -1,5 +1,4 @@
 from twisted.application import service
-from functools import wraps
 import types
 
 class BasePlugin(object, service.Service):

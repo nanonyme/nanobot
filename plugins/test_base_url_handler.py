@@ -1,7 +1,6 @@
 from twisted.application import service
 from twisted.trial import unittest
 import mock
-import twisted.internet
 import base_url_handler
 
 class TestWellDefinedURLs(unittest.TestCase):

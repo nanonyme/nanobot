@@ -1,7 +1,5 @@
-from twisted.application import service
 from twisted.internet import reactor, defer
-import urlparse, urllib
-import BeautifulSoup
+import urlparse
 from base_plugin import BasePlugin, plugin_method
 
 class URLFinder(BasePlugin):

@@ -1,9 +1,8 @@
 from twisted.web import http, client
-from twisted.internet import reactor, defer, protocol
+from twisted.internet import reactor, defer
 import os, time
 from collections import defaultdict
 from urlparse import urlunparse
-import StringIO
 
 class ConnectionAborted(IOError):
     pass
@@ -25,7 +24,7 @@ def create_path(prefix, s):
     return os.path.join(prefix, s)
 
 def valid_item(item, url):
-    if item.timestamp is None or time.time() - lock.timestamp > 5*60:
+    if item.timestamp is None or time.time() - item.timestamp > 5*60:
         return False
     elif item.url is None or item.url != url:
         return False
@@ -94,7 +93,7 @@ class HTTPClient(object):
            d.callback(self._cache_fetch(None, path, lock))
 
     def _handle_error(self, result):
-        e = result.trap(ConnectionAborted)
+        result.trap(ConnectionAborted)
         return "<html><head><title>%s</title></head></html>" % result.getErrorMessage()
 
     def _cache_fetch(self, result, path, lock, d):

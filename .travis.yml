@@ -5,6 +5,6 @@ python:
 before_install: 
    - pip install -q pyflakes
    - find . -name '*.py' |xargs pyflakes
-   - sudo apt-get -q install libssl-dev -y
+   - sudo apt-get -qq install libssl-dev
 install: pip install -q -r requirements.txt --use-mirrors
 script: trial tests.py plugins

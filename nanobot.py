@@ -1,13 +1,17 @@
-from yaml import load, Loader
+import json
 from twisted.words.protocols import irc
-from twisted.internet import protocol
+from twisted.internet import protocol, defer
 from twisted.python import log
-import dispatcher
+import treq
+import lxml.html
+import time
+import re
 
 class NanoBotProtocol(object, irc.IRCClient):
     ping_delay = 180
 
-    def __init__(self, server, bot):
+    def __init__(self, reactor, server, bot):
+        self._reactor = reactor
         self.server = server
         self.bot = bot
 
@@ -23,9 +27,10 @@ class NanoBotProtocol(object, irc.IRCClient):
         irc.IRCClient.signedOn(self)
         for channel in self.channels:
             if 'key' in channel:
-                self.join(channel['name'], channel['key'])
+                self.join(channel['name'].encode(self.server.encoding),
+                          channel['key'].encode(self.server.encoding))
             else:
-                self.join(channel['name'])
+                self.join(channel['name'].encode(self.server.encoding))
 
     def connectionLost(self, reason):
         log.msg("Connection to %s lost" % self.server.hostname)
@@ -33,21 +38,20 @@ class NanoBotProtocol(object, irc.IRCClient):
 
     def privmsg(self, user, channel, message):
         irc.IRCClient.privmsg(self, user, channel, message)
-        self.bot.dispatcher('privmsg', user=user, channel=channel,
-                                    message=message, protocol=self)
-
-    def reply(self, message, target):
-        if 'unicode' in str(type(message)):
-            message = message.encode(self.server.encoding)
-        self.msg(target, message)
-
-    def serialize(self):
-        return {'nickname':self.nickname,
-                'realname':self.realname,
-                'server_name':self.server.name,
-                'encoding':self.server.encoding}
+        self._reactor.callLater(0, self.page_title, user, channel, message)
 
 
+    @defer.inlineCallbacks
+    def page_title(self, user, channel, message):
+        for m in re.finditer("(https?://[^ ]+)", message):
+            url = m.group(0)
+            response = yield treq.get(url)
+            parser = lxml.html.HTMLParser()
+            yield treq.collect(response, parser.feed)
+            root = parser.close()
+            title = root.xpath("//title")[0].text
+            self.say(channel, "title: %s" % title)
+            
 class ServerConnection(protocol.ReconnectingClientFactory):
     protocol = NanoBotProtocol
     def __init__(self, reactor, network_config, bot):
@@ -56,11 +60,11 @@ class ServerConnection(protocol.ReconnectingClientFactory):
         self.network_config = network_config
 
     def buildProtocol(self, addr):
-        protocol = self.protocol(server=self, bot=self.bot)
+        protocol = self.protocol(self._reactor, server=self, bot=self.bot)
         if self.bot.nickname:
-            protocol.nickname = self.bot.nickname
+            protocol.nickname = self.bot.nickname.encode(self.encoding)
         if self.bot.realname:
-            protocol.realname = self.bot.realname
+            protocol.realname = self.bot.realname.encode(self.encoding)
         return protocol
 
     @property
@@ -69,11 +73,11 @@ class ServerConnection(protocol.ReconnectingClientFactory):
 
     @property
     def name(self):
-        return self.network_config.get('name')
+        return self.network_config['name']
 
     @property
     def hostname(self):
-        return self.network_config.get('hostname')
+        return self.network_config['hostname']
 
     @property
     def port(self):
@@ -89,9 +93,11 @@ class ServerConnection(protocol.ReconnectingClientFactory):
 
     def connect(self):
         if self.is_ssl:
-            self._reactor.connectSSL(self.hostname, self.port, self)
+            self._reactor.connectSSL(self.hostname.encode(self.encoding),
+                                     self.port, self)
         else:
-            self._reactor.connectTCP(self.hostname, self.port, self)
+            self._reactor.connectTCP(self.hostname.encode(self.encoding),
+                                     self.port, self)
     
 
 class NanoBot(object):
@@ -102,10 +108,8 @@ class NanoBot(object):
         self._config_filename = config_filename
         self.connections = dict()
         with open(config_filename) as f:
-            self.config = load(f, Loader=Loader)
+            self.config = json.load(f)
             self._init_connections()
-        self.dispatcher = dispatcher.Dispatcher(reactor=self._reactor,
-                                                bot=self)
 
     def _init_connections(self):
         for network_config in self.config['networks']:
@@ -123,18 +127,17 @@ class NanoBot(object):
 
     @property
     def nickname(self):
-        return self.core_config.get('nickname', 'nanobot')
+        return self.core_config.get('nickname', u'nanobot')
 
     @property
     def realname(self):
-        return self.core_config.get('realname',
-                                    'https://bitbucket.org/nanonyme/nanobot')
+        return self.core_config.get('realname', u'https://bitbucket.org/nanonyme/nanobot')
 
 
 def main():
     from twisted.internet import reactor
     log.startLogging(open("nanobot.log", "a"))
-    NanoBot(reactor, "config.yaml")
+    NanoBot(reactor, "config.json")
     reactor.run()
 
 if __name__ == '__main__':

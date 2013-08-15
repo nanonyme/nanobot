@@ -1,0 +1,18 @@
+{ 
+   "core": {
+      "nickname": "nanobot",
+      "realname": "nanobot"
+   },
+   "networks": [
+      { 
+         "name": "network", 
+         "hostname": "hostname", 
+         "channels": [
+             {
+                 "name": "#channel"
+             }
+         ] 
+      }
+   ]
+}
+			

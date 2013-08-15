@@ -6,6 +6,8 @@ import treq
 import lxml.html
 import time
 import re
+import Levenshtein
+import urlparse
 
 class NanoBotProtocol(object, irc.IRCClient):
     ping_delay = 180
@@ -50,8 +52,9 @@ class NanoBotProtocol(object, irc.IRCClient):
             yield treq.collect(response, parser.feed)
             root = parser.close()
             title = root.xpath("//title")[0].text
-            self.say(channel, "title: %s" % title)
-            yield self._reactor.callLater(2, (lambda x:x))
+            if Levenshtein.ratio(urlparse.urlparse(url).path, title) < 0.5:
+                self.say(channel, "title: %s" % title)
+                yield self._reactor.callLater(2, (lambda x:x))
             
 class ServerConnection(protocol.ReconnectingClientFactory):
     protocol = NanoBotProtocol

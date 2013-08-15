@@ -51,6 +51,7 @@ class NanoBotProtocol(object, irc.IRCClient):
             root = parser.close()
             title = root.xpath("//title")[0].text
             self.say(channel, "title: %s" % title)
+            yield self._reactor.callLater(2, (lambda x:x))
             
 class ServerConnection(protocol.ReconnectingClientFactory):
     protocol = NanoBotProtocol

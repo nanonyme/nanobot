@@ -13,6 +13,7 @@ class UrlCache(object):
         self._reactor = reactor
         self._expiration = expiration
         self._db = {}
+        self._reaper = None
 
     def fetch(self, key):
         item = self._db.get(key)
@@ -29,9 +30,19 @@ class UrlCache(object):
             if self._reactor.seconds() - value["timestamp"] < self._expiration:
                 yield key, value
 
-    def reap(self):
-        self._db = dict(self._valid())
+    def enable(self):
+        if self._reaper is None:
+            self._reaper = task.LoopingCall(self._reap)
+            self._reaper.clock = self._reactor
+            self._reaper.start(self._expiration, False)
 
+    def disable(self):
+        if self._reaper is not None:
+            self._reaper.stop()
+            self._reaper = None
+        
+    def _reap(self):
+        self._db = dict(self._valid())
 
 class NanoBotProtocol(object, irc.IRCClient):
     ping_delay = 180
@@ -142,8 +153,7 @@ class NanoBot(object):
         self._config_filename = config_filename
         self.connections = dict()
         self._url_cache = UrlCache(self._reactor, 3600)
-        loop = task.LoopingCall(self._url_cache.reap)
-        loop.start(3600, False)
+        self._url_cache.enable()
         with open(config_filename) as f:
             self.config = json.load(f)
             self._init_connections()

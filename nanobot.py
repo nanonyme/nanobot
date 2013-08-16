@@ -83,14 +83,14 @@ class NanoBotProtocol(object, irc.IRCClient):
         for m in re.finditer("(https?://[^ ]+)", message):
             url = m.group(0)
             try:
-                title = self.bot._title_cache.fetch(url)
+                title = self.bot._url_cache.fetch(url)
                 if title is None:
                     response = yield treq.get(url)
                     parser = lxml.html.HTMLParser()
                     yield treq.collect(response, parser.feed)
                     root = parser.close()
                     title = root.xpath("//title")[0].text.replace("\r\n", "").replace("\n", "")
-                    self.bot._title_cache.update("url", title)
+                    self.bot._url_cache.update("url", title)
                 if Levenshtein.distance(urlparse.urlparse(url).path, title) > 7:
                     self.say(channel, "title: %s" % title)
                     yield self._reactor.callLater(2, (lambda x:x)) # throttle self

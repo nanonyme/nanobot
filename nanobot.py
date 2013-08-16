@@ -47,14 +47,17 @@ class NanoBotProtocol(object, irc.IRCClient):
     def page_title(self, user, channel, message):
         for m in re.finditer("(https?://[^ ]+)", message):
             url = m.group(0)
-            response = yield treq.get(url)
-            parser = lxml.html.HTMLParser()
-            yield treq.collect(response, parser.feed)
-            root = parser.close()
-            title = root.xpath("//title")[0].text
-            if Levenshtein.distance(urlparse.urlparse(url).path, title) > 7:
-                self.say(channel, "title: %s" % title)
-                yield self._reactor.callLater(2, (lambda x:x))
+            try:
+                response = yield treq.get(url)
+                parser = lxml.html.HTMLParser()
+                yield treq.collect(response, parser.feed)
+                root = parser.close()
+                title = root.xpath("//title")[0].text
+                if Levenshtein.distance(urlparse.urlparse(url).path, title) > 7:
+                    self.say(channel, "title: %s" % title)
+                    yield self._reactor.callLater(2, (lambda x:x))
+            except Exception:
+                log.err()
             
 class ServerConnection(protocol.ReconnectingClientFactory):
     protocol = NanoBotProtocol

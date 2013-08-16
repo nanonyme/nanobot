@@ -2,3 +2,4 @@ Twisted
 treq
 lxml
 python-Levenshtein
+pyOpenSSL

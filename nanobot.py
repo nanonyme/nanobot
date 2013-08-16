@@ -48,11 +48,16 @@ class NanoBotProtocol(object, irc.IRCClient):
         for m in re.finditer("(https?://[^ ]+)", message):
             url = m.group(0)
             try:
-                response = yield treq.get(url)
-                parser = lxml.html.HTMLParser()
-                yield treq.collect(response, parser.feed)
-                root = parser.close()
-                title = root.xpath("//title")[0].text.replace("\r\n", " ").replace("\n", " ")
+                title_data = self.bot._title_cache.get(url)
+                if title_data is None or title_data["timestamp"] - time.time > 60:
+                    response = yield treq.get(url)
+                    parser = lxml.html.HTMLParser()
+                    yield treq.collect(response, parser.feed)
+                    root = parser.close()
+                    title_data = {"title": root.xpath("//title")[0].text.replace("\r\n", " ").replace("\n", " "),
+                                  "timestamp": time.time()}
+                    self.bot._title_cache["url"] = title_data
+                title = title_data["title"]
                 if Levenshtein.distance(urlparse.urlparse(url).path, title) > 7:
                     self.say(channel, "title: %s" % title)
                     yield self._reactor.callLater(2, (lambda x:x)) # throttle self
@@ -114,6 +119,7 @@ class NanoBot(object):
         self._reactor = reactor
         self._config_filename = config_filename
         self.connections = dict()
+        self._title_cache = dict()
         with open(config_filename) as f:
             self.config = json.load(f)
             self._init_connections()

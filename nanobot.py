@@ -55,7 +55,7 @@ class NanoBotProtocol(object, irc.IRCClient):
                 title = root.xpath("//title")[0].text.replace("\r\n", " ").replace("\n", " ")
                 if Levenshtein.distance(urlparse.urlparse(url).path, title) > 7:
                     self.say(channel, "title: %s" % title)
-                    yield self._reactor.callLater(2, (lambda x:x))
+                    yield self._reactor.callLater(2, (lambda x:x)) # throttle self
             except Exception:
                 log.err()
             

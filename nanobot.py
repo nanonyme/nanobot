@@ -49,7 +49,7 @@ class NanoBotProtocol(object, irc.IRCClient):
             url = m.group(0)
             try:
                 title_data = self.bot._title_cache.get(url)
-                if title_data is None or title_data["timestamp"] - time.time > 60:
+                if title_data is None or title_data["timestamp"] - time.time() > 60:
                     response = yield treq.get(url)
                     parser = lxml.html.HTMLParser()
                     yield treq.collect(response, parser.feed)

@@ -1,11 +1,11 @@
 from twisted.trial import unittest
 from twisted.internet import task
-from nanobot import UrlCache
+import nanobot
 
 class CacheTests(unittest.TestCase):
     def setUp(self):
         self.clock = task.Clock()
-        self.cache = UrlCache(reactor=self.clock, expiration=60)
+        self.cache = nanobot.UrlCache(reactor=self.clock, expiration=60)
         self.cache.enable()
 
     def tearDown(self):
@@ -24,3 +24,16 @@ class CacheTests(unittest.TestCase):
         value = self.cache.fetch("foo")
         self.assertIs(value, None,
                       "Cache had '%s' for entry 'foo'" % value)
+
+class TestNanoBotProtocol(unittest.TestCase):
+    def testNoUrl(self):
+        self.fail("not implemented")
+
+    def testHttpUrl(self):
+        self.fail("not implemented")
+
+    def testHttpsUrl(self):
+        self.fail("not implemented")
+
+    def testMultipleUrls(self):
+        self.fail("not implemented")

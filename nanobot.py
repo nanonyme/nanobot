@@ -1,13 +1,37 @@
 import json
 from twisted.words.protocols import irc
-from twisted.internet import protocol, defer
+from twisted.internet import protocol, defer, task
 from twisted.python import log
 import treq
 import lxml.html
-import time
 import re
 import Levenshtein
 import urlparse
+
+class UrlCache(object):
+    def __init__(self, reactor, expiration=60):
+        self._reactor = reactor
+        self._expiration = expiration
+        self._db = {}
+
+    def fetch(self, key):
+        item = self._db.get(key)
+        if item is not None:
+            return item["value"]
+        return None
+
+    def update(self, key, value):
+        self._db[key] = {"value": value,
+                         "timestamp": self._reactor.seconds()}
+
+    def _valid(self):
+        for key, value in self._db.iteritems():
+            if self._reactor.seconds() - value["timestamp"] < self._expiration:
+                yield key, value
+
+    def reap(self):
+        self._db = dict(self._valid())
+
 
 class NanoBotProtocol(object, irc.IRCClient):
     ping_delay = 180
@@ -48,16 +72,14 @@ class NanoBotProtocol(object, irc.IRCClient):
         for m in re.finditer("(https?://[^ ]+)", message):
             url = m.group(0)
             try:
-                title_data = self.bot._title_cache.get(url)
-                if title_data is None or title_data["timestamp"] - time.time() > 60:
+                title = self.bot._title_cache.fetch(url)
+                if title is None:
                     response = yield treq.get(url)
                     parser = lxml.html.HTMLParser()
                     yield treq.collect(response, parser.feed)
                     root = parser.close()
-                    title_data = {"title": root.xpath("//title")[0].text.replace("\r\n", " ").replace("\n", " "),
-                                  "timestamp": time.time()}
-                    self.bot._title_cache["url"] = title_data
-                title = title_data["title"]
+                    title = root.xpath("//title")[0].text.replace("\r\n", "").replace("\n", "")
+                    self.bot._title_cache.update("url", title)
                 if Levenshtein.distance(urlparse.urlparse(url).path, title) > 7:
                     self.say(channel, "title: %s" % title)
                     yield self._reactor.callLater(2, (lambda x:x)) # throttle self
@@ -119,7 +141,9 @@ class NanoBot(object):
         self._reactor = reactor
         self._config_filename = config_filename
         self.connections = dict()
-        self._title_cache = dict()
+        self._url_cache = UrlCache(self._reactor, 3600)
+        loop = task.LoopingCall(self._url_cache.reap)
+        loop.start(3600, False)
         with open(config_filename) as f:
             self.config = json.load(f)
             self._init_connections()

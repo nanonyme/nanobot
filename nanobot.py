@@ -1,12 +1,46 @@
 import json
 from twisted.words.protocols import irc
-from twisted.internet import protocol, defer, task
+from twisted.internet import protocol, task
 from twisted.python import log
 import treq
 import lxml.html
 import re
 import Levenshtein
+import functools
 import urlparse
+
+class MessageHandler(object):
+    def __init__(self, reactor, cache, message, callback,
+                 encoding):
+        self._callback = callback
+        self._reactor = reactor
+        self._message = message
+        self._cache = cache
+        self._encoding = encoding
+
+    def __iter__(self):
+        for m in re.finditer("(https?://[^ ]+)", self._message):
+            try:
+                url = m.group(0)
+                title = self._cache.fetch(url)
+                if title is None:
+                    d = treq.get(url)
+                    parser = lxml.html.HTMLParser()
+                    d.addCallback(treq.collect, parser.feed)
+                    yield d
+                    root = parser.close()
+                    title = root.xpath("//title")[0].text
+                    title = title.replace("\r\n", "").replace("\n", "")
+                    title = title.encode(self._encoding)
+                    self._cache.update("url", title)
+                    if Levenshtein.distance(urlparse.urlparse(url).path,
+                                            title) > 7:
+                        self._callback("title: %s" % title)
+                        yield task.deferLater(self._reactor, 2,
+                                              (lambda x:x), None) # throttle self
+            except Exception:
+                log.err()
+
 
 class UrlCache(object):
     def __init__(self, reactor, expiration=60):
@@ -75,29 +109,10 @@ class NanoBotProtocol(object, irc.IRCClient):
 
     def privmsg(self, user, channel, message):
         irc.IRCClient.privmsg(self, user, channel, message)
-        self._reactor.callLater(0, self.page_title, user, channel, message)
-
-
-    @defer.inlineCallbacks
-    def page_title(self, user, channel, message):
-        for m in re.finditer("(https?://[^ ]+)", message):
-            url = m.group(0)
-            try:
-                title = self.bot._url_cache.fetch(url)
-                if title is None:
-                    response = yield treq.get(url)
-                    parser = lxml.html.HTMLParser()
-                    yield treq.collect(response, parser.feed)
-                    root = parser.close()
-                    title = root.xpath("//title")[0].text.replace("\r\n", "").replace("\n", "")
-                    title = title.encode(self.server.encoding)
-                    self.bot._url_cache.update("url", title)
-                if Levenshtein.distance(urlparse.urlparse(url).path, title) > 7:
-                    self.say(channel, "title: %s" % title)
-                    yield task.deferLater(self._reactor, 2,
-                                          (lambda x:x)) # throttle self
-            except Exception:
-                log.err()
+        callback = functools.partial(self.say, channel)
+        handler = MessageHandler(self._reactor, self.bot._url_cache,
+                                 message, callback, self.server.encoding)
+        return task.coiterate(iter(handler))
             
 class ServerConnection(protocol.ReconnectingClientFactory):
     protocol = NanoBotProtocol
@@ -185,7 +200,7 @@ class NanoBot(object):
 
 def main():
     from twisted.internet import reactor
-    log.startLogging(open("nanobot.log", "a"))
+    log.startLogging(open("nanobot.log2", "a"))
     NanoBot(reactor, "config.json")
     reactor.run()
 

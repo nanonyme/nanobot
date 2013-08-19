@@ -1,6 +1,7 @@
 from twisted.trial import unittest
-from twisted.internet import task
+from twisted.internet import task, defer
 import nanobot
+import string
 
 class CacheTests(unittest.TestCase):
     def setUp(self):
@@ -25,15 +26,80 @@ class CacheTests(unittest.TestCase):
         self.assertIs(value, None,
                       "Cache had '%s' for entry 'foo'" % value)
 
-class TestNanoBotProtocol(unittest.TestCase):
+class IgnorantCache(object):
+    def __init__(self):
+        pass
+
+    def fetch(self, key):
+        pass
+
+    def update(self, key, value):
+        pass
+
+class MockTreq(object):
+    def __init__(self, url, data):
+        self.url = url
+        self.data = data
+
+    def get(self, url):
+        if not self.url == url:
+            raise Exception("Wrong URL, got %s, expected %s" % (url, self.url))
+        return defer.succeed(self.data)
+
+    def collect(self, data, callback):
+        callback(data)
+
+class TestMessageHandler(unittest.TestCase):
+
+    def setUp(self):
+        self.clock = task.Clock()        
+        self.fake_cache = IgnorantCache()
+        self.encoding = "UTF-8"
+        self.template = string.Template("""<html>
+        <head>
+        <title>${title}</title>
+        </head>
+        <body>Example body</body>
+        </html>""")
+
+
     def testNoUrl(self):
-        self.fail("not implemented")
+        message_handler = nanobot.MessageHandler(self.clock, self.fake_cache, "foo bar",
+                                                 self.fail, self.encoding)
+        d = next(iter(message_handler), None)
+        self.assertIs(d, None, "Should not give any deferreds")
+
+
+    def step(self, iterator, url, title):
+        nanobot.treq = MockTreq(url, self.template.substitute(title=title))
+        d = next(iterator)
+        self.title = "title: %s" % title
+        yield d
+        d = next(iterator)
+        self.clock.advance(2)
+        yield d
+        
+    def checkTitle(self, title):
+        self.assertEqual(self.title, title)
+
+
+    def run_sequence(self, message, urls, titles):
+        message_handler = nanobot.MessageHandler(self.clock, self.fake_cache, message,
+                                                 self.checkTitle, self.encoding)
+        iterator = iter(message_handler)
+        for url, title in zip(urls, titles):
+            for d in self.step(iterator, url, title):
+                yield d
+        d = next(iterator, None)
+        self.assertIs(d, None, "Should not give more deferreds")
 
     def testHttpUrl(self):
-        self.fail("not implemented")
+        url = "http://meep.com/foo/bar.baz.html#foo"
+        m = "foo %s meep" % url
+        title = "Foo bar baz"
+        return task.coiterate(iter(self.run_sequence("foo %s bar" % url,
+                                                     (url,), (title,))))
 
-    def testHttpsUrl(self):
-        self.fail("not implemented")
 
-    def testMultipleUrls(self):
-        self.fail("not implemented")
+
+    

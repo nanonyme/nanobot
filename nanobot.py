@@ -200,7 +200,7 @@ class NanoBot(object):
 
 def main():
     from twisted.internet import reactor
-    log.startLogging(open("nanobot.log2", "a"))
+    log.startLogging(open("nanobot.log", "a"))
     NanoBot(reactor, "config.json")
     reactor.run()
 

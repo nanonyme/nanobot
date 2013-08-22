@@ -22,12 +22,12 @@ class MessageHandler(object):
         for m in re.finditer("(https?://[^ ]+)", self._message):
             try:
                 url = m.group(0)
+                log.msg("Fetching title for URL %s" % url)
                 title = self._cache.fetch(url)
                 if title is None:
-                    d = treq.get(url)
+                    d = treq.get(url, timeout=5)
                     parser = lxml.html.HTMLParser()
                     d.addCallback(treq.collect, parser.feed)
-                    d.addErrback(log.err)
                     yield d
                     root = parser.close()
                     title = root.xpath("//title")[0].text

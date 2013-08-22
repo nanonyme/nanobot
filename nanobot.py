@@ -27,6 +27,7 @@ class MessageHandler(object):
                     d = treq.get(url)
                     parser = lxml.html.HTMLParser()
                     d.addCallback(treq.collect, parser.feed)
+                    d.addErrback(log.err)
                     yield d
                     root = parser.close()
                     title = root.xpath("//title")[0].text

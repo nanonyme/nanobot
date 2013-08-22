@@ -30,7 +30,7 @@ class MessageHandler(object):
                     yield d
                     root = parser.close()
                     title = root.xpath("//title")[0].text
-                    title = title.replace("\r\n", "").replace("\n", "")
+                    title = " ".join(title.split())
                     title = title.encode(self._encoding)
                     self._cache.update("url", title)
                     if Levenshtein.distance(urlparse.urlparse(url).path,

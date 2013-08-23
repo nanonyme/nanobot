@@ -3,3 +3,4 @@ git+git://github.com/dreid/treq.git@master
 lxml
 python-Levenshtein
 pyOpenSSL
+iptools

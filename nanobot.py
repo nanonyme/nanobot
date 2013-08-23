@@ -8,6 +8,26 @@ import re
 import Levenshtein
 import functools
 import urlparse
+import iptools
+INTERNAL_IPS = iptools.IpRangeList(
+    '127/8',                # full range
+    '192.168/16',               # CIDR network block
+    ('10.0.0.1', '10.0.0.19'),  # arbitrary inclusive range
+    '::1',                      # single IPv6 address
+    'fe80::/10',                # IPv6 CIDR block
+    '::ffff:172.16.0.2'         # IPv4-mapped IPv6 address
+)
+
+def acceptable_netloc(hostname):
+    acceptable = True
+    try:
+        if hostname in INTERNAL_IPS:
+            acceptable = False
+    except TypeError:
+        if hostname == "localhost":
+            acceptable = False
+    return acceptable
+    
 
 class MessageHandler(object):
     def __init__(self, reactor, cache, message, callback,
@@ -24,6 +44,8 @@ class MessageHandler(object):
                 url = m.group(0)
                 log.msg("Fetching title for URL %s" % url)
                 title = self._cache.fetch(url)
+                if not acceptable_netloc(urlparse.urlparse(url).netloc):
+                    continue
                 if title is None:
                     d = treq.get(url, timeout=5)
                     parser = lxml.html.HTMLParser()

@@ -73,7 +73,7 @@ class MessageHandler(object):
                     title = root.xpath("//title")[0].text
                     title = " ".join(title.split())
                     title = title.encode(self._encoding)
-                    self._cache.update("url", title)
+                    self._hits.update("url", title)
                     if Levenshtein.distance(urlparse.urlparse(url).path,
                                             title) > 7:
                         self._callback("title: %s" % title)

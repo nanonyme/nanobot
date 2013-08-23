@@ -36,7 +36,8 @@ class Limiter(object):
 
     def feed(self, data):
         if self.bytes < self.max_bytes:
-            data = data[:self.max_bytes-self.bytes]
+            if len(data) > self.max_bytes - self.bytes:
+                data = data[:self.max_bytes-self.bytes]
             data_len = len(data)
             self.bytes += data_len
             self.callback(data)

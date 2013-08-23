@@ -114,6 +114,12 @@ class NanoBotProtocol(object, irc.IRCClient):
         handler = MessageHandler(self._reactor, self.bot._url_cache,
                                  message, callback, self.server.encoding)
         return task.coiterate(iter(handler))
+
+    def msg(self, user, message, length=None):
+        fmt = 'PRIVMSG %s :' % (user,)
+        length = self._safeMaximumLineLength(fmt) - len(fmt) - 50
+        message = message[:length]
+        irc.IRCClient.msg(self, user, message)
             
 class ServerConnection(protocol.ReconnectingClientFactory):
     protocol = NanoBotProtocol

@@ -27,15 +27,28 @@ def acceptable_netloc(hostname):
         if hostname == "localhost":
             acceptable = False
     return acceptable
-    
+
+class Limiter(object):
+    def __init__(self, max_bytes, callback):
+        self.max_bytes = max_bytes
+        self.bytes = 0
+        self.callback = callback
+
+    def feed(self, data):
+        if self.bytes < self.max_bytes:
+            data = data[:self.max_bytes-self.bytes]
+            data_len = len(data)
+            self.bytes += data_len
+            self.callback(data)
 
 class MessageHandler(object):
-    def __init__(self, reactor, cache, message, callback,
+    def __init__(self, reactor, hits, misses, message, callback,
                  encoding):
         self._callback = callback
         self._reactor = reactor
         self._message = message
-        self._cache = cache
+        self._hits = hits
+        self._misses = misses
         self._encoding = encoding
 
     def __iter__(self):
@@ -43,13 +56,18 @@ class MessageHandler(object):
             try:
                 url = m.group(0)
                 log.msg("Fetching title for URL %s" % url)
-                title = self._cache.fetch(url)
+                title = self._hits.fetch(url)
+                miss = self._misses.fetch(url)
                 if not acceptable_netloc(urlparse.urlparse(url).netloc):
+                    continue
+                if miss:
+                    log.msg("Skipped")
                     continue
                 if title is None:
                     d = treq.get(url, timeout=5)
                     parser = lxml.html.HTMLParser()
-                    d.addCallback(treq.collect, parser.feed)
+                    limiter = Limiter(2*1024**2, parser.feed)
+                    d.addCallback(treq.collect, limiter.feed)
                     yield d
                     root = parser.close()
                     title = root.xpath("//title")[0].text
@@ -62,6 +80,7 @@ class MessageHandler(object):
                         yield task.deferLater(self._reactor, 2,
                                               (lambda x:x), None) # throttle self
             except Exception:
+                self._misses.update(url, "miss")
                 log.err()
 
 
@@ -133,7 +152,7 @@ class NanoBotProtocol(object, irc.IRCClient):
     def privmsg(self, user, channel, message):
         irc.IRCClient.privmsg(self, user, channel, message)
         callback = functools.partial(self.say, channel)
-        handler = MessageHandler(self._reactor, self.bot._url_cache,
+        handler = MessageHandler(self._reactor, self.bot._hits, self.bot._misses,
                                  message, callback, self.server.encoding)
         return task.coiterate(iter(handler))
 
@@ -198,8 +217,10 @@ class NanoBot(object):
         self._reactor = reactor
         self._config_filename = config_filename
         self.connections = dict()
-        self._url_cache = UrlCache(self._reactor, 3600)
-        self._url_cache.enable()
+        self._hits = UrlCache(self._reactor, 3600)
+        self._misses = UrlCache(self._reactor, 60)
+        self._hits.enable()
+        self._misses.enable()
         with open(config_filename) as f:
             self.config = json.load(f)
             self._init_connections()

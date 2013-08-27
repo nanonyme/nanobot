@@ -125,7 +125,7 @@ class ProcessProtocol(protocol.ProcessProtocol):
     def processExited(self, status):
         log.msg("Process exited with status code %s")
         log.msg("".join(self.logs))
-        return task.coiterate(iter(self.bot.reconnect_app()))
+        return self.bot.reconnect_app()
 
 
 class NanoBot(object):
@@ -161,7 +161,7 @@ class NanoBot(object):
     def reconnect_app(self):
         log.msg("App start requested")
         if not self.exiting:
-            d = task.deferLater(self._reactor, 1, self._do_reconnect)
+            return task.deferLater(self._reactor, 1, self._do_reconnect)
 
 
     def _do_reconnect(self):

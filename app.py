@@ -158,12 +158,16 @@ def handleCommand(protocol, user, channel, message, encoding, max_line_length):
     command, _, suffix = message.partition(" ")
     with sqlite3.connect(config["core"]["db"]) as conn:
         cur = conn.cursor()
-        cur = cur.execute("select roles.name from roles where roles.oid in (select userroles.oid from (user natural join usermask) natural join userroles);")
-        roles = cur.fetchmany()
-        if "command" == "rehash":
+        res = cur.execute("select roles.name from roles where roles.oid in (select userroles.oid from (user natural join usermask) natural join userroles where usermask.mask=?);", (user,))
+        roles = [role[0] for role in res.fetchmany()]
+        if command == "rehash":
             if "superadmin" in roles:
+                log.msg("Restarting app")
                 reactor.stop()
-
+            else:
+                log.msg("User %s tried to rehash" % user)
+        else:
+            log.msg("Unrecognized command %s" % command)
 
 def log_and_exit(ret, reactor):
     log.err()

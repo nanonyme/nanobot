@@ -160,7 +160,7 @@ def handleCommand(protocol, user, channel, message, encoding, max_line_length):
         cur = conn.cursor()
         res = cur.execute("select roles.name from roles where roles.oid in (select userroles.oid from (user natural join usermask) natural join userroles where usermask.mask=?);", (user,))
         roles = [role[0] for role in res.fetchmany()]
-        if command == "rehash":
+        if command == "reincarnate":
             if "superadmin" in roles:
                 log.msg("Restarting app")
                 reactor.stop()

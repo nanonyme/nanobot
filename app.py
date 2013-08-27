@@ -11,6 +11,7 @@ import Levenshtein
 import urlparse
 import iptools
 import json
+import sqlite3
 
 INTERNAL_IPS = iptools.IpRangeList(
     '127/8',                # full range
@@ -20,6 +21,9 @@ INTERNAL_IPS = iptools.IpRangeList(
     'fe80::/10',                # IPv6 CIDR block
     '::ffff:172.16.0.2'         # IPv4-mapped IPv6 address
 )
+
+config = {}
+
 
 def acceptable_netloc(hostname):
     acceptable = True
@@ -139,10 +143,27 @@ class API(pb.Referenceable):
     
     def remote_handleMessage(self, protocol, user, channel, message,
                              encoding, max_line_length):
-        callback = functools.partial(protocol.callRemote, "say", channel)
-        handler = MessageHandler(self.reactor, self.good_urls, self.bad_urls,
-                                 message, callback, encoding, max_line_length)
+        if message.startswith("!"):
+            return handleCommand(protocol, user, channel, message[1:], encoding, max_line_length)
+        else:
+            callback = functools.partial(protocol.callRemote, "say", channel)
+            handler = MessageHandler(self.reactor, self.good_urls, self.bad_urls,
+                                     message, callback, encoding, max_line_length)
         return task.coiterate(iter(handler))
+
+
+
+
+def handleCommand(protocol, user, channel, message, encoding, max_line_length):
+    command, _, suffix = message.partition(" ")
+    with sqlite3.connect(config["core"]["db"]) as conn:
+        cur = conn.cursor()
+        cur = cur.execute("select roles.name from roles where roles.oid in (select userroles.oid from (user natural join usermask) natural join userroles);")
+        roles = cur.fetchmany()
+        if "command" == "rehash":
+            if "superadmin" in roles:
+                reactor.stop()
+
 
 def log_and_exit(ret, reactor):
     log.err()
@@ -153,7 +174,6 @@ def register(root, reactor):
     return root.callRemote("register", API(reactor))
 
 if __name__ == "__main__":
-    config = {}
     with open(environ["CONFIG"]) as f:
         config.update(json.load(f))
     log.startLogging(open(config["core"]["log_file"], "a"))

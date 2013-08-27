@@ -171,7 +171,10 @@ def handleCommand(protocol, user, channel, message, encoding, max_line_length):
             if not password:
                 password = None
             if "superadmin" in roles:
-                log.msg("Joining %s" % channel)
+                if password:
+                    log.msg("Joining %s (%s)" % (channel, password))
+                else:
+                    log.msg("Joining %s" % channel)
                 return protocol.callRemote("join", channel, password)
         elif command == "leave":
             channel = suffix

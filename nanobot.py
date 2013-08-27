@@ -13,7 +13,7 @@ class RemoteProtocol(pb.Referenceable):
     def remote_say(self, channel, message):
         self.protocol.say(channel, message)
 
-    def remote_join(self, channel, key=None):
+    def remote_join(self, channel, key):
         self.protocol.join(channel, key)
 
     def remote_leave(self, channel, reason=None):

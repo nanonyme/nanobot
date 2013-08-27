@@ -16,7 +16,7 @@ class RemoteProtocol(pb.Referenceable):
     def remote_join(self, channel, key):
         self.protocol.join(channel, key)
 
-    def remote_leave(self, channel, reason=None):
+    def remote_leave(self, channel, reason):
         self.protocol.leave(channel, reason)
 
 class NanoBotProtocol(object, irc.IRCClient):

@@ -177,9 +177,14 @@ def handleCommand(protocol, user, channel, message, encoding, max_line_length):
                     log.msg("Joining %s" % channel)
                 return protocol.callRemote("join", channel, password)
         elif command == "leave":
-            channel = suffix
+            channel, _, reason = suffix.partition(" ")
+            if not reason:
+                reason = None
             if "superadmin" in roles:
-                log.msg("Leaving %s", channel)
+                if reason:
+                    log.msg("Leaving %s (%s)", (channel, reason))
+                else:
+                    log.msg("Leaving %s", channel)
                 return protocol.callRemote("leave", channel)
         else:
             log.msg("Unrecognized command %s" % command)

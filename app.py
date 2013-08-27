@@ -88,7 +88,7 @@ class MessageHandler(object):
                 log.msg("Got title %s" % title)
                 if Levenshtein.distance(urlparse.urlparse(url).path,
                                         title) > 7:
-                    log.msg("Will try to say title on channel")
+                    log.msg("Will try to send title as a message")
                     yield self._callback("title: %s" % title)
                     yield task.deferLater(self._reactor, 2,
                                           (lambda x:x), None) # throttle self

@@ -1,125 +1,24 @@
 import json
 from twisted.words.protocols import irc
-from twisted.internet import protocol, task
+from twisted.internet import protocol
+from twisted.internet import endpoints
+from twisted.spread import pb
+import sys
+
 from twisted.python import log
-import treq
-import lxml.html
-import re
-import Levenshtein
-import functools
-import urlparse
-import iptools
-INTERNAL_IPS = iptools.IpRangeList(
-    '127/8',                # full range
-    '192.168/16',               # CIDR network block
-    ('10.0.0.1', '10.0.0.19'),  # arbitrary inclusive range
-    '::1',                      # single IPv6 address
-    'fe80::/10',                # IPv6 CIDR block
-    '::ffff:172.16.0.2'         # IPv4-mapped IPv6 address
-)
 
-def acceptable_netloc(hostname):
-    acceptable = True
-    try:
-        if hostname in INTERNAL_IPS:
-            acceptable = False
-    except TypeError:
-        if hostname == "localhost":
-            acceptable = False
-    return acceptable
+class RemoteProtocol(pb.Referenceable):
+    def __init__(self, protocol):
+        self.protocol = protocol
 
-class Limiter(object):
-    def __init__(self, max_bytes, callback):
-        self.max_bytes = max_bytes
-        self.bytes = 0
-        self.callback = callback
+    def remote_say(self, channel, message):
+        self.protocol.say(channel, message)
 
-    def feed(self, data):
-        if self.bytes < self.max_bytes:
-            if len(data) > self.max_bytes - self.bytes:
-                data = data[:self.max_bytes-self.bytes]
-            data_len = len(data)
-            self.bytes += data_len
-            self.callback(data)
+    def remote_join(self, channel, key=None):
+        self.protocol.join(channel, key)
 
-class MessageHandler(object):
-    def __init__(self, reactor, hits, misses, message, callback,
-                 encoding):
-        self._callback = callback
-        self._reactor = reactor
-        self._message = message
-        self._hits = hits
-        self._misses = misses
-        self._encoding = encoding
-
-    def __iter__(self):
-        for m in re.finditer("(https?://[^ ]+)", self._message):
-            try:
-                url = m.group(0)
-                log.msg("Fetching title for URL %s" % url)
-                title = self._hits.fetch(url)
-                miss = self._misses.fetch(url)
-                if not acceptable_netloc(urlparse.urlparse(url).netloc):
-                    continue
-                if miss:
-                    log.msg("Skipped")
-                    continue
-                if title is None:
-                    d = treq.get(url, timeout=5)
-                    parser = lxml.html.HTMLParser()
-                    limiter = Limiter(2*1024**2, parser.feed)
-                    d.addCallback(treq.collect, limiter.feed)
-                    yield d
-                    root = parser.close()
-                    title = root.xpath("//title")[0].text
-                    title = " ".join(title.split())
-                    title = title.encode(self._encoding)
-                    self._hits.update("url", title)
-                    if Levenshtein.distance(urlparse.urlparse(url).path,
-                                            title) > 7:
-                        self._callback("title: %s" % title)
-                        yield task.deferLater(self._reactor, 2,
-                                              (lambda x:x), None) # throttle self
-            except Exception:
-                self._misses.update(url, "miss")
-                log.err()
-
-
-class UrlCache(object):
-    def __init__(self, reactor, expiration=60):
-        self._reactor = reactor
-        self._expiration = expiration
-        self._db = {}
-        self._reaper = None
-
-    def fetch(self, key):
-        item = self._db.get(key)
-        if item is not None:
-            return item["value"]
-        return None
-
-    def update(self, key, value):
-        self._db[key] = {"value": value,
-                         "timestamp": self._reactor.seconds()}
-
-    def _valid(self):
-        for key, value in self._db.iteritems():
-            if self._reactor.seconds() - value["timestamp"] < self._expiration:
-                yield key, value
-
-    def enable(self):
-        if self._reaper is None:
-            self._reaper = task.LoopingCall(self._reap)
-            self._reaper.clock = self._reactor
-            self._reaper.start(self._expiration, False)
-
-    def disable(self):
-        if self._reaper is not None:
-            self._reaper.stop()
-            self._reaper = None
-        
-    def _reap(self):
-        self._db = dict(self._valid())
+    def remote_leave(self, channel, reason=None):
+        self.protocol.leave(channel, reason)
 
 class NanoBotProtocol(object, irc.IRCClient):
     ping_delay = 180
@@ -152,17 +51,13 @@ class NanoBotProtocol(object, irc.IRCClient):
 
     def privmsg(self, user, channel, message):
         irc.IRCClient.privmsg(self, user, channel, message)
-        callback = functools.partial(self.say, channel)
-        handler = MessageHandler(self._reactor, self.bot._hits, self.bot._misses,
-                                 message, callback, self.server.encoding)
-        return task.coiterate(iter(handler))
-
-    def msg(self, user, message, length=None):
+        ref = RemoteProtocol(self)
         fmt = 'PRIVMSG %s :' % (user,)
-        length = self._safeMaximumLineLength(fmt) - len(fmt) - 50
-        message = message[:length]
-        irc.IRCClient.msg(self, user, message)
-            
+        max_len = self._safeMaximumLineLength(fmt) - len(fmt) - 50
+        self.bot.app.callRemote("handleMessage", ref, user, channel, message,
+                                self.server.encoding, max_len)
+
+
 class ServerConnection(protocol.ReconnectingClientFactory):
     protocol = NanoBotProtocol
     def __init__(self, reactor, network_config, bot):
@@ -209,30 +104,69 @@ class ServerConnection(protocol.ReconnectingClientFactory):
         else:
             self._reactor.connectTCP(self.hostname.encode(self.encoding),
                                      self.port, self)
-    
+
+
+class RegistrationApi(pb.Root):
+    def __init__(self, bot):
+        self.bot = bot
+
+    def remote_register(self, app):
+        log.msg("Got registration request for %s" % str(app))
+        self.bot.app = app
+        return self.bot.core_config
+
+class ProcessProtocol(protocol.ProcessProtocol):
+    def __init__(self, bot):
+        self.bot = bot
+        self.logs = []
+
+    def errReceived(self, data):
+        self.logs.append(data)
+
+    def processExited(self, status):
+        log.msg("Process exited with status code %s")
+        log.msg("".join(self.logs))
+        self.bot.reconnect_app()
+
 
 class NanoBot(object):
+    app = None
+    exiting = False
 
     def __init__(self, reactor, config_filename):
         self._network = None
+        self._proc = None
         self._reactor = reactor
         self._config_filename = config_filename
         self.connections = dict()
-        self._hits = UrlCache(self._reactor, 3600)
-        self._misses = UrlCache(self._reactor, 60)
-        self._hits.enable()
-        self._misses.enable()
         with open(config_filename) as f:
             self.config = json.load(f)
-            self._init_connections()
+        log.startLogging(open(self.core_config["log_file"], "a"))
+        endpoint = endpoints.serverFromString(self._reactor,
+                                              str(self.core_config["masterEndpoint"]))
+        factory = pb.PBServerFactory(RegistrationApi(self))
+        conn = endpoint.listen(factory)
+        self.reconnect_app()
+        self._init_connections()
+
 
     def _init_connections(self):
+        log.msg("Setting up networks")
         for network_config in self.config['networks']:
             network = ServerConnection(reactor=self._reactor,
                                        network_config=network_config,
                                        bot=self)
             self.connections[network.name] = network
             network.connect()
+
+    def reconnect_app(self):
+        log.msg("App start requested")
+        if not self.exiting:
+            log.msg("Starting app logic layer and telling it to connect")
+            self._proc = self._reactor.spawnProcess(ProcessProtocol(self),
+                                                    sys.executable,
+                                                    args=[sys.executable, "app.py"],
+                                                    env={"CONFIG": "config.json"})
 
     @property
     def core_config(self):
@@ -248,11 +182,16 @@ class NanoBot(object):
     def realname(self):
         return self.core_config.get('realname', u'https://bitbucket.org/nanonyme/nanobot')
 
+    def shutdown(self):
+        self.exiting = True
+        if self._proc:
+            self.proc.signalProcess('KILL')
+        
 
 def main():
     from twisted.internet import reactor
-    log.startLogging(open("nanobot.log", "a"))
-    NanoBot(reactor, "config.json")
+    nanobot = NanoBot(reactor, "config.json")
+    reactor.addSystemEventTrigger("before", "shutdown", nanobot.shutdown)
     reactor.run()
 
 if __name__ == '__main__':

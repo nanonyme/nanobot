@@ -141,18 +141,25 @@ class API(pb.Referenceable):
         self.bad_urls = UrlCache(self.reactor, expiration=60)
         self.bad_urls.enable()
     
-    def remote_handleMessage(self, protocol, user, channel, message,
-                             encoding, max_line_length):
-        if message.startswith("!"):
-            return handleCommand(protocol, user, channel, message[1:], encoding, max_line_length)
-        else:
-            callback = functools.partial(protocol.callRemote, "say", channel)
-            handler = MessageHandler(self.reactor, self.good_urls, self.bad_urls,
+    def remote_handlePublicMessage(self, protocol, user, channel, message,
+                                   encoding, max_line_length):
+        log.msg("Got message %s on channel %s from user %s" % (message, channel, user))
+        try:
+            if message.startswith("!"):
+                return handleCommand(protocol, user, channel, message[1:], encoding, max_line_length)
+            else:
+                callback = functools.partial(protocol.callRemote, "msg", channel)
+                handler = MessageHandler(self.reactor, self.good_urls, self.bad_urls,
                                      message, callback, encoding, max_line_length)
-        return task.coiterate(iter(handler))
+                return task.coiterate(iter(handler))
+        except Exception:
+            log.err()
 
-
-
+    def remote_handlePrivateMessage(self, protocol, user, channel, message,
+                                    encoding, max_line_length):
+        channel, _, _ = user.partition("!")
+        return self.remote_handlePublicMessage(protocol, user, channel, message,
+                                               encoding, max_line_length)
 
 def handleCommand(protocol, user, channel, message, encoding, max_line_length):
     command, _, suffix = message.partition(" ")
@@ -185,7 +192,7 @@ def handleCommand(protocol, user, channel, message, encoding, max_line_length):
                     log.msg("Leaving %s (%s)", (channel, reason))
                 else:
                     log.msg("Leaving %s", channel)
-                return protocol.callRemote("leave", channel)
+                return protocol.callRemote("leave", channel, reason)
         else:
             log.msg("Unrecognized command %s" % command)
 

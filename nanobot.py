@@ -10,8 +10,8 @@ class RemoteProtocol(pb.Referenceable):
     def __init__(self, protocol):
         self.protocol = protocol
 
-    def remote_say(self, channel, message):
-        self.protocol.say(channel, message)
+    def remote_msg(self, user, message):
+        self.protocol.msg(user, message)
 
     def remote_join(self, channel, key):
         self.protocol.join(channel, key)
@@ -53,8 +53,12 @@ class NanoBotProtocol(object, irc.IRCClient):
         ref = RemoteProtocol(self)
         fmt = 'PRIVMSG %s :' % (user,)
         max_len = self._safeMaximumLineLength(fmt) - len(fmt) - 50
-        d = self.bot.app.callRemote("handleMessage", ref, user, channel,
-                                    message, self.server.encoding, max_len)
+        if channel == self.nickname:
+            d = self.bot.app.callRemote("handlePrivateMessage", ref, user, channel,
+                                        message, self.server.encoding, max_len)
+        else:
+            d = self.bot.app.callRemote("handlePublicMessage", ref, user, channel,
+                                        message, self.server.encoding, max_len)
         d.addErrback(log.err)
 
 class ServerConnection(protocol.ReconnectingClientFactory):

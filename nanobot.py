@@ -1,7 +1,6 @@
 import json
 from twisted.words.protocols import irc
-from twisted.internet import protocol
-from twisted.internet import endpoints
+from twisted.internet import protocol, task, endpoints
 from twisted.spread import pb
 import sys
 
@@ -54,9 +53,9 @@ class NanoBotProtocol(object, irc.IRCClient):
         ref = RemoteProtocol(self)
         fmt = 'PRIVMSG %s :' % (user,)
         max_len = self._safeMaximumLineLength(fmt) - len(fmt) - 50
-        self.bot.app.callRemote("handleMessage", ref, user, channel, message,
-                                self.server.encoding, max_len)
-
+        d = self.bot.app.callRemote("handleMessage", ref, user, channel,
+                                    message, self.server.encoding, max_len)
+        d.addErrback(log.err)
 
 class ServerConnection(protocol.ReconnectingClientFactory):
     protocol = NanoBotProtocol
@@ -126,7 +125,7 @@ class ProcessProtocol(protocol.ProcessProtocol):
     def processExited(self, status):
         log.msg("Process exited with status code %s")
         log.msg("".join(self.logs))
-        self.bot.reconnect_app()
+        return task.coiterate(iter(self.bot.reconnect_app()))
 
 
 class NanoBot(object):
@@ -162,11 +161,17 @@ class NanoBot(object):
     def reconnect_app(self):
         log.msg("App start requested")
         if not self.exiting:
-            log.msg("Starting app logic layer and telling it to connect")
-            self._proc = self._reactor.spawnProcess(ProcessProtocol(self),
-                                                    sys.executable,
-                                                    args=[sys.executable, "app.py"],
-                                                    env={"CONFIG": "config.json"})
+            d = task.deferLater(self._reactor, 1, self._do_reconnect)
+
+
+    def _do_reconnect(self):
+        log.msg("Starting app logic layer and telling it to connect")
+        self._proc = self._reactor.spawnProcess(ProcessProtocol(self),
+                                                sys.executable,
+                                                args=[sys.executable,
+                                                      "app.py"],
+                                                env={"CONFIG": "config.json"})
+            
 
     @property
     def core_config(self):

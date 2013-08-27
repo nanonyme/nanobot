@@ -143,7 +143,6 @@ class API(pb.Referenceable):
     
     def remote_handlePublicMessage(self, protocol, user, channel, message,
                                    encoding, max_line_length):
-        log.msg("Got message %s on channel %s from user %s" % (message, channel, user))
         try:
             if message.startswith("!"):
                 return handleCommand(protocol, user, channel, message[1:], encoding, max_line_length)

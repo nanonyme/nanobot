@@ -165,7 +165,19 @@ def handleCommand(protocol, user, channel, message, encoding, max_line_length):
                 log.msg("Restarting app")
                 reactor.stop()
             else:
-                log.msg("User %s tried to rehash" % user)
+                log.msg("User %s tried to do code reload" % user)
+        elif command == "join":
+            channel, _, password = suffix.partition(" ")
+            if not password:
+                password = None
+            if "superadmin" in roles:
+                log.msg("Joining %s" % channel)
+                return protocol.callRemote("join", channel, password)
+        elif command == "leave":
+            channel = suffix
+            if "superadmin" in roles:
+                log.msg("Leaving %s", channel)
+                return protocol.callRemote("leave", channel)
         else:
             log.msg("Unrecognized command %s" % command)
 

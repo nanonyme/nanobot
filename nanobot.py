@@ -123,7 +123,7 @@ class ProcessProtocol(protocol.ProcessProtocol):
         self.logs.append(data)
 
     def processExited(self, status):
-        log.msg("Process exited with status code %s")
+        log.msg("Process exited with status code %s" % status)
         log.msg("".join(self.logs))
         return self.bot.reconnect_app()
 

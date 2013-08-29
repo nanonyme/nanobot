@@ -1,5 +1,5 @@
 from twisted.spread import pb
-from twisted.internet.endpoints import clientFromString
+from twisted.internet import endpoints, defer
 from os import environ
 from twisted.internet import task, reactor
 from twisted.python import log
@@ -58,12 +58,11 @@ class ResponseHandler(object):
         else:
             d.cancel()
 
-    def handle(self, response):
+    def handle_head(self, response, url):
         headers = response.headers.getRawHeaders("Content-Type")
-        self.d = treq.collect(response, self.feed)
-        self.d.addErrback(self.trap_cancellation)
         if not headers:
-            self.d.cancel()
+            d = defer.fail(Exception("No Content-Type"))
+            d.addErrback(self.trap_err)
         else:
             header = headers[0]
             log.msg("Header line %s" % header)
@@ -75,16 +74,24 @@ class ResponseHandler(object):
                 except LookupError:
                     encoding = None
             if mime not in self.accepted_mimes:
-                self.d.cancel()
+                d = defer.fail(Exception("Mime %s not supported" % mime))
+                d.addErrback(self.trap_err)
             else:
-                if encoding:
-                    self.parser = self.parser_class(encoding=encoding)
-                    log.msg("Using encoding %s to handle response" % encoding)
-                else:
-                    self.parser = self.parser_class()
-        return self.d
+                d = treq.get(url, timeout=5)
+                d.addCallback(self.handle_get, encoding)
+        return d
 
-    def trap_cancellation(self, err):
+    def handle_get(self, response, encoding):
+        if encoding:
+            self.parser = self.parser_class(encoding=encoding)
+            log.msg("Using encoding %s to handle response" % encoding)
+        else:
+            self.parser = self.parser_class()
+        d = treq.collect(response, self.parser.feed)
+        return d
+
+
+    def trap_err(self, err):
         self.err = err
 
 
@@ -112,9 +119,9 @@ class MessageHandler(object):
                     log.msg("Skipped")
                     continue
                 if title is None:
-                    d = treq.get(url, timeout=5)
+                    d = treq.head(url, timeout=5)
                     handler = ResponseHandler(max_body=2*1024**2, parser_class=lxml.html.HTMLParser)
-                    d.addCallback(handler.handle)
+                    d.addCallback(handler.handle_head, url)
                     yield d
                     if handler.err:
                         handler.err.raiseException()
@@ -248,7 +255,7 @@ if __name__ == "__main__":
         config.update(json.load(f))
     log.startLogging(open(config["core"]["log_file"], "a"))
     appEndpoint = str(config["core"]["slaveEndpoint"])
-    client = clientFromString(reactor, str(appEndpoint))
+    client = endpoints.clientFromString(reactor, str(appEndpoint))
     factory = pb.PBClientFactory()
     client.connect(factory)
     d = factory.getRootObject()

@@ -12,6 +12,7 @@ import urlparse
 import iptools
 import json
 import sqlite3
+import codecs
 
 INTERNAL_IPS = iptools.IpRangeList(
     '127/8',                # full range
@@ -24,7 +25,6 @@ INTERNAL_IPS = iptools.IpRangeList(
 
 config = {}
 
-
 def acceptable_netloc(hostname):
     acceptable = True
     try:
@@ -35,19 +35,46 @@ def acceptable_netloc(hostname):
             acceptable = False
     return acceptable
 
-class Limiter(object):
-    def __init__(self, max_bytes, callback):
-        self.max_bytes = max_bytes
+class ResponseHandler(object):
+    
+    def __init__(self, max_body, parser_class):
+        self.max_body = max_body
         self.bytes = 0
-        self.callback = callback
+        self.parser_class = parser_class
+        self.parser = None
+        self.d = None
 
     def feed(self, data):
-        if self.bytes < self.max_bytes:
-            if len(data) > self.max_bytes - self.bytes:
-                data = data[:self.max_bytes-self.bytes]
+        if self.bytes < self.max_body:
+            if len(data) > self.max_body - self.bytes:
+                data = data[:self.max_body-self.bytes]
             data_len = len(data)
             self.bytes += data_len
-            self.callback(data)
+            self.parser.feed(data)
+        else:
+            d.cancel()
+
+    def handle(self, response):
+        headers = response.headers.getRawHeaders("Content-Type")
+        for header in headers:
+            log.msg("Header line %s" % header)
+            mime, _, encoding = header.partition(";")
+            if not encoding:
+                continue
+            _, _, encoding = encoding.strip().partition("=")
+            try:
+                codecs.lookup(encoding)
+            except LookupError:
+                encoding = None
+            else:
+                break
+        if encoding:
+            self.parser = self.parser_class(encoding=encoding)
+            log.msg("Using encoding %s to handle response" % encoding)
+        else:
+            self.parser = self.parser_class()
+        self.d = treq.collect(response, self.feed)
+        return self.d
 
 class MessageHandler(object):
     def __init__(self, reactor, hits, misses, message, callback,
@@ -74,11 +101,10 @@ class MessageHandler(object):
                     continue
                 if title is None:
                     d = treq.get(url, timeout=5)
-                    parser = lxml.html.HTMLParser()
-                    limiter = Limiter(2*1024**2, parser.feed)
-                    d.addCallback(treq.collect, limiter.feed)
+                    handler = ResponseHandler(max_body=2*1024**2, parser_class=lxml.html.HTMLParser)
+                    d.addCallback(handler.handle)
                     yield d
-                    root = parser.close()
+                    root = handler.parser.close()
                     title = root.xpath("//title")[0].text
                     title = " ".join(title.split())
                     if len(title) > self._max_len:

@@ -46,6 +46,7 @@ class ResponseHandler(object):
         self.parser = None
         self.d = None
         self.accepted_mimes = accepted_mimes
+        self.err = None
 
     def feed(self, data):
         if self.bytes < self.max_body:
@@ -60,6 +61,7 @@ class ResponseHandler(object):
     def handle(self, response):
         headers = response.headers.getRawHeaders("Content-Type")
         self.d = treq.collect(response, self.feed)
+        self.d.addErrback(self.trap_cancellation)
         if not headers:
             self.d.cancel()
         else:
@@ -81,6 +83,10 @@ class ResponseHandler(object):
                 else:
                     self.parser = self.parser_class()
         return self.d
+
+    def trap_cancellation(self, err):
+        self.err = err
+
 
 class MessageHandler(object):
     def __init__(self, reactor, hits, misses, message, callback,
@@ -110,6 +116,8 @@ class MessageHandler(object):
                     handler = ResponseHandler(max_body=2*1024**2, parser_class=lxml.html.HTMLParser)
                     d.addCallback(handler.handle)
                     yield d
+                    if handler.err:
+                        handler.err.raiseException()
                     root = handler.parser.close()
                     title = root.xpath("//title")[0].text
                     title = " ".join(title.split())

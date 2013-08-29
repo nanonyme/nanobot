@@ -1,8 +1,7 @@
 from twisted.spread import pb
-from twisted.internet import endpoints, defer
+from twisted.internet import endpoints, task, reactor
+from twisted.python import failure, log
 from os import environ
-from twisted.internet import task, reactor
-from twisted.python import log
 import functools
 import treq
 import lxml.html
@@ -35,7 +34,7 @@ def acceptable_netloc(hostname):
             acceptable = False
     return acceptable
 
-class ResponseHandler(object):
+class UrlHandler(object):
     
     
     def __init__(self, max_body, parser_class,
@@ -58,11 +57,15 @@ class ResponseHandler(object):
         else:
             d.cancel()
 
-    def handle_head(self, response, url):
+    def parse_body(self, url):
+        d = treq.head(url, timeout=5)
+        d.addCallback(self.handle_head, url, d)
+        return d
+
+    def handle_head(self, response, url, d):
         headers = response.headers.getRawHeaders("Content-Type")
         if not headers:
-            d = defer.fail(Exception("No Content-Type"))
-            d.addErrback(self.trap_err)
+            self.err = failure.Failure("No Content-Type", Exception)
         else:
             header = headers[0]
             log.msg("Header line %s" % header)
@@ -74,12 +77,12 @@ class ResponseHandler(object):
                 except LookupError:
                     encoding = None
             if mime not in self.accepted_mimes:
-                d = defer.fail(Exception("Mime %s not supported" % mime))
-                d.addErrback(self.trap_err)
+                self.err = failure.Failure("Mime %s not supported" % mime, Exception)
             else:
                 d = treq.get(url, timeout=5)
                 d.addCallback(self.handle_get, encoding)
-        return d
+                d.addErrback(self.trap_err)
+                return d
 
     def handle_get(self, response, encoding):
         if encoding:
@@ -119,11 +122,10 @@ class MessageHandler(object):
                     log.msg("Skipped")
                     continue
                 if title is None:
-                    d = treq.head(url, timeout=5)
-                    handler = ResponseHandler(max_body=2*1024**2, parser_class=lxml.html.HTMLParser)
-                    d.addCallback(handler.handle_head, url)
-                    yield d
+                    handler = UrlHandler(max_body=2*1024**2, parser_class=lxml.html.HTMLParser)
+                    yield handler.parse_body(url)
                     if handler.err:
+                        log.msg("Finished requests")
                         handler.err.raiseException()
                     root = handler.parser.close()
                     title = root.xpath("//title")[0].text
@@ -140,6 +142,7 @@ class MessageHandler(object):
                     yield task.deferLater(self._reactor, 2,
                                           (lambda x:x), None) # throttle self
             except Exception:
+                log.msg("Adding the URL to temporary block list")
                 self._misses.update(url, "miss")
                 log.err()
 

@@ -37,12 +37,15 @@ def acceptable_netloc(hostname):
 
 class ResponseHandler(object):
     
-    def __init__(self, max_body, parser_class):
+    
+    def __init__(self, max_body, parser_class,
+                 accepted_mimes=("text/html",)):
         self.max_body = max_body
         self.bytes = 0
         self.parser_class = parser_class
         self.parser = None
         self.d = None
+        self.accepted_mimes = accepted_mimes
 
     def feed(self, data):
         if self.bytes < self.max_body:
@@ -56,24 +59,27 @@ class ResponseHandler(object):
 
     def handle(self, response):
         headers = response.headers.getRawHeaders("Content-Type")
-        for header in headers:
+        self.d = treq.collect(response, self.feed)
+        if not headers:
+            self.d.cancel()
+        else:
+            header = headers[0]
             log.msg("Header line %s" % header)
             mime, _, encoding = header.partition(";")
-            if not encoding:
-                continue
-            _, _, encoding = encoding.strip().partition("=")
-            try:
-                codecs.lookup(encoding)
-            except LookupError:
-                encoding = None
+            if encoding:
+                _, _, encoding = encoding.strip().partition("=")
+                try:
+                    codecs.lookup(encoding)
+                except LookupError:
+                    encoding = None
+            if mime not in self.accepted_mimes:
+                self.d.cancel()
             else:
-                break
-        if encoding:
-            self.parser = self.parser_class(encoding=encoding)
-            log.msg("Using encoding %s to handle response" % encoding)
-        else:
-            self.parser = self.parser_class()
-        self.d = treq.collect(response, self.feed)
+                if encoding:
+                    self.parser = self.parser_class(encoding=encoding)
+                    log.msg("Using encoding %s to handle response" % encoding)
+                else:
+                    self.parser = self.parser_class()
         return self.d
 
 class MessageHandler(object):

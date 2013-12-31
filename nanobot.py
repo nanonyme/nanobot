@@ -145,10 +145,12 @@ class NanoBot(object):
         with open(config_filename) as f:
             self.config = json.load(f)
         log.startLogging(open(self.core_config["log_file"], "a"))
-        endpoint = endpoints.serverFromString(self._reactor,
-                                              str(self.core_config["masterEndpoint"]))
+        self.endpoint = endpoints.serverFromString(self._reactor,
+                                                   str(self.core_config["masterEndpoint"]))
+
+    def run(self):
         factory = pb.PBServerFactory(RegistrationApi(self))
-        conn = endpoint.listen(factory)
+        conn = self.endpoint.listen(factory)
         self.reconnect_app()
         self._init_connections()
 
@@ -200,6 +202,7 @@ class NanoBot(object):
 def main():
     from twisted.internet import reactor
     nanobot = NanoBot(reactor, "config.json")
+    reactor.callWhenRunning(nanobot.run)
     reactor.addSystemEventTrigger("before", "shutdown", nanobot.shutdown)
     reactor.run()
 

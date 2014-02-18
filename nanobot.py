@@ -1,9 +1,9 @@
 import json
 from twisted.words.protocols import irc
-from twisted.internet import protocol, task, endpoints
+from twisted.internet import protocol, task, endpoints, defer
 from twisted.spread import pb
 import sys
-
+from collections import deque
 from twisted.python import log
 
 class RemoteProtocol(pb.Referenceable):
@@ -54,12 +54,11 @@ class NanoBotProtocol(object, irc.IRCClient):
         fmt = 'PRIVMSG %s :' % (user,)
         max_len = self._safeMaximumLineLength(fmt) - len(fmt) - 50
         if channel == self.nickname:
-            d = self.bot.app.callRemote("handlePrivateMessage", ref, user, channel,
-                                        message, self.server.encoding, max_len)
+            self.bot.api.callRemote("handlePrivateMessage", ref, user, channel,
+                                    message, self.server.encoding, max_len)
         else:
-            d = self.bot.app.callRemote("handlePublicMessage", ref, user, channel,
-                                        message, self.server.encoding, max_len)
-        d.addErrback(log.err)
+            self.bot.api.callRemote("handlePublicMessage", ref, user, channel,
+                                    message, self.server.encoding, max_len)
 
 class ServerConnection(protocol.ReconnectingClientFactory):
     protocol = NanoBotProtocol
@@ -109,18 +108,36 @@ class ServerConnection(protocol.ReconnectingClientFactory):
                                      self.port, self)
 
 
-class RegistrationApi(pb.Root):
-    def __init__(self, bot):
-        self.bot = bot
+class ApiProxy(pb.Root):
+    def __init__(self):
+        self.app = None
+        self.queue = deque()
+        self.coop = task.Cooperator()
+
+    def callRemote(self, *args, **kwargs):
+        self.queue.append((args, kwargs))
+        if not self.coop.running:
+            self.coop.coiterate(iter(self))
+
+
+    def __iter__(self):
+        while True:
+            if not self.app or not self.queue:
+                log.msg("Pausing execution")
+                break
+            else:
+                args, kwargs = self.queue.popleft()
+                log.msg("Dispatching %s %s" % (str(args), str(kwargs)))
+                yield self.app.callRemote(*args, **kwargs)
 
     def remote_register(self, app):
         log.msg("Got registration request for %s" % str(app))
-        self.bot.app = app
-        return self.bot.core_config
+        self.app = app
+        self.coop.coiterate(iter(self))
 
 class ProcessProtocol(protocol.ProcessProtocol):
-    def __init__(self, bot):
-        self.bot = bot
+    def __init__(self, api):
+        self.api = api
         self.logs = []
 
     def errReceived(self, data):
@@ -145,12 +162,14 @@ class NanoBot(object):
         with open(config_filename) as f:
             self.config = json.load(f)
         log.startLogging(open(self.core_config["log_file"], "a"))
+        self.api = ApiProxy()
         self.endpoint = endpoints.serverFromString(self._reactor,
                                                    str(self.core_config["masterEndpoint"]))
 
+
     def run(self):
-        factory = pb.PBServerFactory(RegistrationApi(self))
-        conn = self.endpoint.listen(factory)
+        factory = pb.PBServerFactory(self.api)
+        self.endpoint.listen(factory)
         self.reconnect_app()
         self._init_connections()
 
@@ -172,7 +191,7 @@ class NanoBot(object):
 
     def _do_reconnect(self):
         log.msg("Starting app logic layer and telling it to connect")
-        self._proc = self._reactor.spawnProcess(ProcessProtocol(self),
+        self._proc = self._reactor.spawnProcess(ProcessProtocol(self.api),
                                                 sys.executable,
                                                 args=[sys.executable,
                                                       "app.py"],
@@ -196,7 +215,7 @@ class NanoBot(object):
     def shutdown(self):
         self.exiting = True
         if self._proc:
-            self.proc.signalProcess('KILL')
+            self._proc.signalProcess('KILL')
         
 
 def main():

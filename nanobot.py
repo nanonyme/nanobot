@@ -112,18 +112,24 @@ class ApiProxy(pb.Root):
     def __init__(self):
         self.app = None
         self.queue = deque()
-        self.coop = task.Cooperator()
+        self.running = False
 
     def callRemote(self, *args, **kwargs):
         self.queue.append((args, kwargs))
-        if not self.coop.running:
-            self.coop.coiterate(iter(self))
+        self.run()
+
+    def run(self):
+        if not self.running:
+            log.msg("Scheduling")
+            self.running = True
+            task.coiterate(iter(self))
 
 
     def __iter__(self):
         while True:
             if not self.app or not self.queue:
                 log.msg("Pausing execution")
+                self.running = False
                 break
             else:
                 args, kwargs = self.queue.popleft()
@@ -133,7 +139,7 @@ class ApiProxy(pb.Root):
     def remote_register(self, app):
         log.msg("Got registration request for %s" % str(app))
         self.app = app
-        self.coop.coiterate(iter(self))
+        self.run()
 
 class ProcessProtocol(protocol.ProcessProtocol):
     def __init__(self, api):

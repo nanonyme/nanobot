@@ -1,6 +1,6 @@
 import json
 from twisted.words.protocols import irc
-from twisted.internet import protocol, task, endpoints, defer
+from twisted.internet import protocol, task, endpoints
 from twisted.spread import pb
 import sys
 from collections import deque
@@ -133,8 +133,10 @@ class ApiProxy(pb.Root):
                 break
             else:
                 args, kwargs = self.queue.popleft()
-                log.msg("Dispatching %s %s" % (str(args), str(kwargs)))
-                yield self.app.callRemote(*args, **kwargs)
+                d = self.app.callRemote(*args, **kwargs)
+                d.addErrback(log.err)
+                yield d
+
 
     def remote_register(self, app):
         log.msg("Got registration request for %s" % str(app))

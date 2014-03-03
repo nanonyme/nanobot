@@ -38,7 +38,7 @@ combined with lxml push-driven parsing.  The push-driven parsing
 allows for most buffering to happen inside lxml. The bot also has
 support for some commands currently including a reincarnate command
 where the app process dies and is spawned again by the IRC process
-(which is sort of a supervisor). Credentials are kept in a sqlite3
+(which is sort of a supervisor). Credentials are kept in an sqlite3
 database.
 
 License

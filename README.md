@@ -1,3 +1,10 @@
+nanobot - an extensible IRC bot
+==============================
+
+- [General architecture](#general-architecture)
+- [Functionality](#functionality)
+- [License](#license)
+
 General architecture
 --------------------
 

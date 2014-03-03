@@ -29,8 +29,8 @@ messaging, etc) without any need for changes on the IRC process
 side. For connecting to new servers and changing settings another
 proxy object for the IRC bot itself will most likely need to be created.
 
-Functionality 
-------------- 
+Functionality
+-------------
 
 The bot isn't currently capable of much. It has a proof-of-concept URL
 title resolving using asynchronic HTTP client functionality of Twisted

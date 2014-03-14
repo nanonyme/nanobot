@@ -144,8 +144,9 @@ class ApiProxy(pb.Root):
         self.run()
 
 class ProcessProtocol(protocol.ProcessProtocol):
-    def __init__(self, api):
+    def __init__(self, api, bot):
         self.api = api
+        self.bot = bot
         self.logs = []
 
     def errReceived(self, data):

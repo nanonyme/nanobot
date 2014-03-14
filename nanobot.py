@@ -144,8 +144,7 @@ class ApiProxy(pb.Root):
         self.run()
 
 class ProcessProtocol(protocol.ProcessProtocol):
-    def __init__(self, api, bot):
-        self.api = api
+    def __init__(self, bot):
         self.bot = bot
         self.logs = []
 
@@ -200,7 +199,7 @@ class NanoBot(object):
 
     def _do_reconnect(self):
         log.msg("Starting app logic layer and telling it to connect")
-        self._proc = self._reactor.spawnProcess(ProcessProtocol(self.api),
+        self._proc = self._reactor.spawnProcess(ProcessProtocol(self),
                                                 sys.executable,
                                                 args=[sys.executable,
                                                       "app.py"],

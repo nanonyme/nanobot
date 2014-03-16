@@ -1,6 +1,8 @@
 nanobot - an extensible IRC bot
 ==============================
 
+[![Build Status](https://travis-ci.org/nanonyme/nanobot.png?branch=master)](https://travis-ci.org/nanonyme/nanobot)
+
 - [General architecture](#general-architecture)
 - [Functionality](#functionality)
 - [License](#license)

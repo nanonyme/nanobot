@@ -39,7 +39,10 @@ class UrlHandler(object):
     
     def __init__(self, max_body, parser_class,
                  accepted_mimes=("text/html",),
-                 headers={"Accepted-Languages": "en-US"}):
+                 headers={"Accept-Language": "en-US",
+                          "User-Agent": ("nanobot title fetching, contacts to"
+                                         "http://github.com/nanonyme/nanobot")
+                          }):
         self.max_body = max_body
         self.bytes = 0
         self.parser_class = parser_class

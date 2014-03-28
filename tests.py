@@ -39,8 +39,9 @@ class IgnorantCache(object):
 
 
 class MockResponse(object):
-    def __init__(self, data, headers):
+    def __init__(self, data, headers, code=200):
         self.data = data
+        self.code = code
         self._headers = headers
     
     @property
@@ -56,12 +57,12 @@ class MockTreq(object):
         self.data = data
         self.headers = headers
 
-    def get(self, url, timeout=None):
+    def get(self, url, timeout=None, headers={}):
         if not self.url == url:
             raise Exception("Wrong URL, got %s, expected %s" % (url, self.url))
         return defer.succeed(self.data)
 
-    def head(self, url, timeout=None):
+    def head(self, url, timeout=None, headers={}):
         if not self.url == url:
             raise Exception("Wrong URL, got %s, expected %s" % (url, self.url))
         return defer.succeed(MockResponse("", self.headers))

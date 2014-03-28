@@ -134,9 +134,13 @@ class ApiProxy(pb.Root):
             else:
                 args, kwargs = self.queue.popleft()
                 d = self.app.callRemote(*args, **kwargs)
-                d.addErrback(log.err)
+                d.addErrback(self._fail)
                 yield d
 
+
+    def _fail(self, exc):
+        self.app = None
+        log.err(exc)
 
     def remote_register(self, app):
         log.msg("Got registration request for %s" % str(app))

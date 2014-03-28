@@ -38,7 +38,8 @@ class UrlHandler(object):
     
     
     def __init__(self, max_body, parser_class,
-                 accepted_mimes=("text/html",)):
+                 accepted_mimes=("text/html",),
+                 headers={"Accepted-Languages": "en-US"}):
         self.max_body = max_body
         self.bytes = 0
         self.parser_class = parser_class
@@ -46,6 +47,7 @@ class UrlHandler(object):
         self.d = None
         self.accepted_mimes = accepted_mimes
         self.err = None
+        self.headers = headers
 
     def feed(self, data):
         if self.bytes < self.max_body:
@@ -58,11 +60,14 @@ class UrlHandler(object):
             d.cancel()
 
     def parse_body(self, url):
-        d = treq.head(url, timeout=5)
+        d = treq.head(url, timeout=5, headers=self.headers)
         d.addCallback(self.handle_head, url, d)
         return d
 
     def handle_head(self, response, url, d):
+        if response.code != 200:
+            self.err = failure.Failure("Response code %d" % response.code)
+            return
         headers = response.headers.getRawHeaders("Content-Type")
         if not headers:
             self.err = failure.Failure("No Content-Type", Exception)
@@ -79,7 +84,7 @@ class UrlHandler(object):
             if mime not in self.accepted_mimes:
                 self.err = failure.Failure("Mime %s not supported" % mime, Exception)
             else:
-                d = treq.get(url, timeout=5)
+                d = treq.get(url, timeout=5, headers=self.headers)
                 d.addCallback(self.handle_get, encoding)
                 d.addErrback(self.trap_err)
                 return d

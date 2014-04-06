@@ -13,6 +13,10 @@ import json
 import sqlite3
 import codecs
 
+
+class AppException(Exception):
+    pass
+
 INTERNAL_IPS = iptools.IpRangeList(
     '127/8',                # full range
     '192.168/16',               # CIDR network block
@@ -69,11 +73,12 @@ class UrlHandler(object):
 
     def handle_head(self, response, url, d):
         if response.code != 200:
-            self.err = failure.Failure("Response code %d" % response.code)
+            self.err = failure.Failure("Response code %d" % response.code,
+                                       AppException)
             return
         headers = response.headers.getRawHeaders("Content-Type")
         if not headers:
-            self.err = failure.Failure("No Content-Type", Exception)
+            self.err = failure.Failure("No Content-Type", AppException)
         else:
             header = headers[0]
             log.msg("Header line %s" % header)
@@ -85,7 +90,8 @@ class UrlHandler(object):
                 except LookupError:
                     encoding = None
             if mime not in self.accepted_mimes:
-                self.err = failure.Failure("Mime %s not supported" % mime, Exception)
+                self.err = failure.Failure("Mime %s not supported" % mime,
+                                           AppException)
             else:
                 d = treq.get(url, timeout=5, headers=self.headers)
                 d.addCallback(self.handle_get, encoding)

@@ -1,5 +1,5 @@
 from twisted.spread import pb
-from twisted.internet import endpoints, task, reactor
+from twisted.internet import endpoints, task, reactor, defer
 from twisted.python import failure, log
 from os import environ
 import functools
@@ -51,9 +51,7 @@ class UrlHandler(object):
         self.bytes = 0
         self.parser_class = parser_class
         self.parser = None
-        self.d = None
         self.accepted_mimes = accepted_mimes
-        self.err = None
         self.headers = headers
 
     def feed(self, data):
@@ -67,18 +65,14 @@ class UrlHandler(object):
             d.cancel()
 
     def parse_body(self, url):
-        d = treq.head(url, timeout=5, headers=self.headers)
-        d.addCallback(self.handle_head, url, d)
         return d
 
-    def handle_head(self, response, url, d):
+    def handle_response(self, response, handle_body):
         if response.code != 200:
-            self.err = failure.Failure("Response code %d" % response.code,
-                                       AppException)
-            return
+            raise AppException("Response code %d" % response.code)
         headers = response.headers.getRawHeaders("Content-Type")
         if not headers:
-            self.err = failure.Failure("No Content-Type", AppException)
+            raise AppException("No Content-Type")
         else:
             header = headers[0]
             log.msg("Header line %s" % header)
@@ -90,26 +84,22 @@ class UrlHandler(object):
                 except LookupError:
                     encoding = None
             if mime not in self.accepted_mimes:
-                self.err = failure.Failure("Mime %s not supported" % mime,
-                                           AppException)
-            else:
-                d = treq.get(url, timeout=5, headers=self.headers)
-                d.addCallback(self.handle_get, encoding)
-                d.addErrback(self.trap_err)
-                return d
-
-    def handle_get(self, response, encoding):
-        if encoding:
-            self.parser = self.parser_class(encoding=encoding)
-            log.msg("Using encoding %s to handle response" % encoding)
-        else:
+                raise AppException("Mime %s not supported" % mime)
+        if handle_body:
+            if encoding:
+                log.msg("Using encoding %s to handle response" % encoding)            
             self.parser = self.parser_class()
-        d = treq.collect(response, self.parser.feed)
+            return treq.collect(response, self.parser.feed)
+
+    def get_title(self, url):
+        d = treq.head(url, timeout=30, headers=self.headers)
+        d.addCallback(self.handle_response, handle_body=False)
+        d.addCallback(lambda _: treq.get(url, timeout=30, headers=self.headers))
+        d.addCallback(self.handle_response, handle_body=True)
+        d.addCallback(lambda _: self.parser.close())
+        d.addCallback(lambda root: root.xpath("//title")[0].text)
+        d.addCallback(lambda title: " ".join(title.split()))
         return d
-
-
-    def trap_err(self, err):
-        self.err = err
 
 
 class MessageHandler(object):
@@ -123,42 +113,40 @@ class MessageHandler(object):
         self._encoding = encoding
         self._max_len = max_len
 
+    def success(self, title, url):
+        if len(title) > self._max_len:
+            title = title[:self._max_len]
+        if title:
+            title = title.encode(self._encoding)
+            self._hits.update(url, title)
+            log.msg("Got title %s" % title)
+            if Levenshtein.distance(urlparse.urlparse(url).path, title) > 7:
+                log.msg("Will try to send title as a message")
+                d = self._callback("title: %s" % title)
+                d.addCallback(lambda _:task.deferLater(self._reactor, 2, defer.succeed, None))
+                return d
+
+    def fail(self, err, url):
+        log.msg("Adding the URL to temporary block list")
+        self._misses.update(url, "miss")
+        log.err(err)
+
     def __iter__(self):
         for m in re.finditer("(https?://[^ ]+)", self._message):
-            try:
-                url = m.group(0)
-                log.msg("Fetching title for URL %s" % url)
-                title = self._hits.fetch(url)
-                miss = self._misses.fetch(url)
-                if not acceptable_netloc(urlparse.urlparse(url).netloc):
-                    continue
-                if miss:
-                    log.msg("Skipped")
-                    continue
-                if title is None:
-                    handler = UrlHandler(max_body=2*1024**2, parser_class=lxml.html.HTMLParser)
-                    yield handler.parse_body(url)
-                    if handler.err:
-                        log.msg("Finished requests")
-                        handler.err.raiseException()
-                    root = handler.parser.close()
-                    title = root.xpath("//title")[0].text
-                    title = " ".join(title.split())
-                    if len(title) > self._max_len:
-                        title = title[:self._max_len]
-                    title = title.encode(self._encoding)
-                    self._hits.update("url", title)
-                log.msg("Got title %s" % title)
-                if Levenshtein.distance(urlparse.urlparse(url).path,
-                                        title) > 7:
-                    log.msg("Will try to send title as a message")
-                    yield self._callback("title: %s" % title)
-                    yield task.deferLater(self._reactor, 2,
-                                          (lambda x:x), None) # throttle self
-            except Exception:
-                log.msg("Adding the URL to temporary block list")
-                self._misses.update(url, "miss")
-                log.err()
+            url = m.group(0)
+            log.msg("Fetching title for URL %s" % url)
+            if not acceptable_netloc(urlparse.urlparse(url).netloc):
+                continue
+            if self._misses.fetch(url):
+                log.msg("Skipped")
+                continue
+            title = self._hits.fetch(url)
+            if title is None:
+                handler = UrlHandler(max_body=2*1024**2, parser_class=lxml.html.HTMLParser)
+                d = handler.get_title(url)
+                d.addCallback(self.success, url)
+                d.addErrback(self.fail, url)
+                yield d
 
 
 class UrlCache(object):

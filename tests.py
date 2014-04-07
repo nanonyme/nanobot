@@ -60,15 +60,15 @@ class MockTreq(object):
     def get(self, url, timeout=None, headers={}):
         if not self.url == url:
             raise Exception("Wrong URL, got %s, expected %s" % (url, self.url))
-        return defer.succeed(self.data)
+        return defer.succeed(MockResponse(self.data, self.headers))
 
     def head(self, url, timeout=None, headers={}):
         if not self.url == url:
             raise Exception("Wrong URL, got %s, expected %s" % (url, self.url))
         return defer.succeed(MockResponse("", self.headers))
 
-    def collect(self, data, callback):
-        callback(data)
+    def collect(self, response, callback):
+        callback(response.data.decode("utf-8"))
 
 class TestMessageHandler(unittest.TestCase):
 
@@ -88,7 +88,8 @@ class TestMessageHandler(unittest.TestCase):
     def testNoUrl(self):
         message_handler = app.MessageHandler(self.clock, self.hit_cache,
                                              self.miss_cache, "foo bar",
-                                             self.fail, self.encoding, 255)
+                                             lambda x: self.fail(x),
+                                             self.encoding, 255)
         d = next(iter(message_handler), None)
         self.assertIs(d, None, "Should not give any deferreds")
 
@@ -97,35 +98,29 @@ class TestMessageHandler(unittest.TestCase):
         app.treq = MockTreq(url, self.template.substitute(title=title),
                             {"content-type": ("text/html;utf-8",)})
         d = next(iterator)
-        self.title = "title: %s" % title
-        yield d
-        d = next(iterator)
-        yield d
-        d = next(iterator)
-        self.clock.advance(2)
-        yield d
+        title = "title: %s" % title
+        d.addCallback(lambda: self.clock.advance(2))
+        return d
         
-    def checkTitle(self, title):
-        self.assertEqual(self.title, title)
-
-
-    def run_sequence(self, message, urls, titles):
-        message_handler = app.MessageHandler(self.clock, self.hit_cache,
-                                             self.miss_cache, message,
-                                             self.checkTitle, self.encoding, 255)
-        iterator = iter(message_handler)
+    def runSequence(self, message, urls, titles):
         for url, title in zip(urls, titles):
-            for d in self.step(iterator, url, title):
-                yield d
-        self.assertRaises(StopIteration, next, iterator)
+            yield self.step(message_handler, url, title)
 
     def testHttpUrl(self):
         url = "http://meep.com/foo/bar.baz.html#foo"
         m = "foo %s meep" % url
         title = "Foo bar baz"
-        return task.coiterate(iter(self.run_sequence("foo %s bar" % url,
-                                                     (url,), (title,))))
-
+        output = "title: %s" % title
+        def callback(x):
+            self.assertEqual(x, output)
+            return defer.succeed(None)
+        message_handler = app.MessageHandler(self.clock, self.hit_cache,
+                                             self.miss_cache, url,
+                                             callback,
+                                             self.encoding, 255)
+        iterator = iter(message_handler)
+        self.step(iterator, url, title)
+        self.assertRaises(StopIteration, next, iterator)
 
 
     

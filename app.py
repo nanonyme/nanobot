@@ -89,7 +89,7 @@ class UrlHandler(object):
             if encoding:
                 log.msg("Using encoding %s to handle response" % encoding)            
             self.parser = self.parser_class()
-            return treq.collect(response, self.parser.feed)
+            return treq.collect(response, self.feed)
 
     def get_title(self, url):
         d = treq.head(url, timeout=30, headers=self.headers)

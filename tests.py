@@ -39,7 +39,7 @@ class IgnorantCache(object):
 
 
 class MockResponse(object):
-    def __init__(self, data, headers, code=200):
+    def __init__(self, data, headers, code):
         self.data = data
         self.code = code
         self._headers = headers
@@ -52,20 +52,22 @@ class MockResponse(object):
         return self._headers[key.lower()]
 
 class MockTreq(object):
-    def __init__(self, url, data, headers):
+    def __init__(self, url, data, headers, code=200):
         self.url = url
         self.data = data
         self.headers = headers
+        self.code = code
 
     def get(self, url, timeout=None, headers={}):
         if not self.url == url:
             raise Exception("Wrong URL, got %s, expected %s" % (url, self.url))
-        return defer.succeed(MockResponse(self.data, self.headers))
+        return defer.succeed(MockResponse(self.data, self.headers,
+                                          code=self.code))
 
     def head(self, url, timeout=None, headers={}):
         if not self.url == url:
             raise Exception("Wrong URL, got %s, expected %s" % (url, self.url))
-        return defer.succeed(MockResponse("", self.headers))
+        return defer.succeed(MockResponse("", self.headers, code=self.code))
 
     def collect(self, response, callback):
         callback(response.data.decode("utf-8"))
@@ -93,11 +95,23 @@ class TestMessageHandler(unittest.TestCase):
         d = next(iter(message_handler), None)
         self.assertIs(d, None, "Should not give any deferreds")
 
+    def testUnsupportedScheme(self):
+        message_handler = app.MessageHandler(self.clock, self.hit_cache,
+                                             self.miss_cache, "foo bar",
+                                             lambda x: self.fail(x),
+                                             self.encoding, 255)
+        d = next(iter(message_handler), None)
+        self.assertIs(d, None, "Should not give any deferreds")
 
-    def step(self, iterator, url, title):
+
+    def step(self, iterator, url, title, code=200,
+             override_headers=None):
+        headers = {"content-type": ("text/html;utf-8",)}
+        if override_headers:
+            headers.update(override_headers)
         self.output = "title: %s" % title
         app.treq = MockTreq(url, self.template.substitute(title=title),
-                            {"content-type": ("text/html;utf-8",)})
+                            headers=headers, code=code)
         d = next(iterator)
         title = "title: %s" % title
         d.addCallback(lambda: self.clock.advance(2))

@@ -110,6 +110,9 @@ class TestMessageHandler(unittest.TestCase):
         self.runSequence(["http://meep.com/foo/bar.baz.html#foo",
                           "http://meep.com/foo/bar.baz.html#bar"])
 
+    def testHttpAndHttps(self):
+        self.runSequence(["http://meep.com/foo/bar.baz.html#foo",
+                          "https://meep.com/foo/bar.baz.html#bar"])
 
     def callback(self, x):
         self.assertEqual(x, self.output)

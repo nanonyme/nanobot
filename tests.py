@@ -95,6 +95,7 @@ class TestMessageHandler(unittest.TestCase):
 
 
     def step(self, iterator, url, title):
+        self.output = "title: %s" % title
         app.treq = MockTreq(url, self.template.substitute(title=title),
                             {"content-type": ("text/html;utf-8",)})
         d = next(iterator)
@@ -102,25 +103,29 @@ class TestMessageHandler(unittest.TestCase):
         d.addCallback(lambda: self.clock.advance(2))
         return d
         
-    def runSequence(self, message, urls, titles):
-        for url, title in zip(urls, titles):
-            yield self.step(message_handler, url, title)
-
     def testHttpUrl(self):
-        url = "http://meep.com/foo/bar.baz.html#foo"
-        m = "foo %s meep" % url
-        title = "Foo bar baz"
-        output = "title: %s" % title
-        def callback(x):
-            self.assertEqual(x, output)
-            return defer.succeed(None)
+        self.runSequence(["http://meep.com/foo/bar.baz.html#foo"])
+
+    def testMultipleUrls(self):
+        self.runSequence(["http://meep.com/foo/bar.baz.html#foo",
+                          "http://meep.com/foo/bar.baz.html#bar"])
+
+
+    def callback(self, x):
+        self.assertEqual(x, self.output)
+        return defer.succeed(None)
+
+    def runSequence(self, urls):
         message_handler = app.MessageHandler(self.clock, self.hit_cache,
-                                             self.miss_cache, url,
-                                             callback,
+                                             self.miss_cache, " ".join(urls),
+                                             self.callback,
                                              self.encoding, 255)
         iterator = iter(message_handler)
-        self.step(iterator, url, title)
-        self.assertRaises(StopIteration, next, iterator)
+        d = defer.succeed(None)
+        for url in urls:
+            _, _, title = url.partition("#")
+            d.addCallback(lambda _:self.step(iterator, url, title))
+        d.addCallback(lambda _: self.assertRaises(StopIteration, next, iterator))
 
 
     

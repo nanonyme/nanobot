@@ -52,11 +52,11 @@ class MockResponse(object):
         return self._headers[key.lower()]
 
 class MockTreq(object):
-    def __init__(self, url, data, headers, code=200):
+    def __init__(self, url, data, headers, code=None):
         self.url = url
         self.data = data
         self.headers = headers
-        self.code = code
+        self.code = code or 200
 
     def get(self, url, timeout=None, headers={}):
         if not self.url == url:
@@ -97,15 +97,39 @@ class TestMessageHandler(unittest.TestCase):
 
     def testUnsupportedScheme(self):
         message_handler = app.MessageHandler(self.clock, self.hit_cache,
-                                             self.miss_cache, "foo bar",
+                                             self.miss_cache, "gopher://foo/bar#baz",
                                              lambda x: self.fail(x),
                                              self.encoding, 255)
         d = next(iter(message_handler), None)
         self.assertIs(d, None, "Should not give any deferreds")
 
+    def testForbidden(self):
+        msg = "http://foo/bar"
+        message_handler = app.MessageHandler(self.clock, self.hit_cache,
+                                             self.miss_cache, msg,
+                                             lambda x: self.fail(x),
+                                             self.encoding, 255)
+        iterator = iter(message_handler)
+        d = self.step(iterator, msg, "foo", code=400)
+        d.addCallback(self.ensureException)
 
-    def step(self, iterator, url, title, code=200,
-             override_headers=None):
+    def testBadType(self):
+        msg = "http://foo/bar"
+        message_handler = app.MessageHandler(self.clock, self.hit_cache,
+                                             self.miss_cache, msg,
+                                             lambda x: self.fail(x),
+                                             self.encoding, 255)
+        iterator = iter(message_handler)
+        d = self.step(iterator, msg, "foo",
+                      override_headers={"content-type": ("image/png",)})
+        d.addCallback(self.ensureException)
+
+    def ensureException(self, e):
+        errors = self.flushLoggedErrors(app.AppException)
+        self.assertEqual(len(errors), 1)
+
+
+    def step(self, iterator, url, title, code=None, override_headers=None):
         headers = {"content-type": ("text/html;utf-8",)}
         if override_headers:
             headers.update(override_headers)
@@ -114,7 +138,7 @@ class TestMessageHandler(unittest.TestCase):
                             headers=headers, code=code)
         d = next(iterator)
         title = "title: %s" % title
-        d.addCallback(lambda: self.clock.advance(2))
+        d.addCallback(lambda e: self.clock.advance(2))
         return d
         
     def testHttpUrl(self):

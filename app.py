@@ -1,6 +1,6 @@
 from twisted.spread import pb
 from twisted.internet import endpoints, task, reactor, defer
-from twisted.python import failure, log
+from twisted.python import log
 from os import environ
 import functools
 import treq
@@ -62,7 +62,7 @@ class UrlHandler(object):
             self.bytes += data_len
             self.parser.feed(data)
         else:
-            d.cancel()
+            self.d.cancel()
 
     def handle_response(self, response, handle_body):
         if response.code != 200:
@@ -99,7 +99,8 @@ class UrlHandler(object):
         d.addCallback(lambda _: self.parser.close())
         d.addCallback(lambda root: root.xpath("//title")[0].text)
         d.addCallback(lambda title: " ".join(title.split()))
-        return d
+        self.d = d
+        return self.d
 
 
 class MessageHandler(object):

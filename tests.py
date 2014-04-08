@@ -13,19 +13,29 @@ class CacheTests(unittest.TestCase):
     def tearDown(self):
         self.cache.disable()
 
-    def testGetNotExpired(self):
+    def testGetReaperNotRun(self):
         self.cache.update("foo", "bar")
         self.assertEquals(self.cache.fetch("foo"),
                           "bar", "Expected cache to have 'foo' for 'bar'")
 
-    def testGetExpired(self):
+    def testReaperExpiresItem(self):
         self.cache.update("foo", "bar")
         self.assertEquals(self.cache.fetch("foo"),
                           "bar", "Expected cache to have 'foo' for 'bar'")
-        self.clock.advance(60)
+        self.clock.advance(60)        
         value = self.cache.fetch("foo")
         self.assertIs(value, None,
                       "Cache had '%s' for entry 'foo'" % value)
+
+    def testReaperLeavesItem(self):
+        self.clock.advance(59)
+        self.cache.update("foo", "bar")
+        self.assertEquals(self.cache.fetch("foo"),
+                          "bar", "Expected cache to have 'foo' for 'bar'")
+        self.clock.advance(1)
+        self.cache.update("foo", "bar")
+        self.assertEquals(self.cache.fetch("foo"),
+                          "bar", "Expected cache to have 'foo' for 'bar'")
 
 class IgnorantCache(object):
     def __init__(self):

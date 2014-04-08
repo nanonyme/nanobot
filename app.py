@@ -64,9 +64,6 @@ class UrlHandler(object):
         else:
             d.cancel()
 
-    def parse_body(self, url):
-        return d
-
     def handle_response(self, response, handle_body):
         if response.code != 200:
             raise AppException("Response code %d" % response.code)

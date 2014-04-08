@@ -123,7 +123,7 @@ class TestMessageHandler(unittest.TestCase):
         d = self.step(iterator, msg, "foo", code=400)
         d.addCallback(self.ensureException)
 
-    def testBadType(self):
+    def testUnsupportedType(self):
         msg = "http://foo/bar"
         message_handler = app.MessageHandler(self.clock, self.hit_cache,
                                              self.miss_cache, msg,
@@ -131,7 +131,29 @@ class TestMessageHandler(unittest.TestCase):
                                              self.encoding, 255)
         iterator = iter(message_handler)
         d = self.step(iterator, msg, "foo",
-                      override_headers={"content-type": ("image/png",)})
+                      headers={"content-type": ("image/png",)})
+        d.addCallback(self.ensureException)
+
+    def testBrokenTypeHeader(self):
+        msg = "http://foo/bar"
+        message_handler = app.MessageHandler(self.clock, self.hit_cache,
+                                             self.miss_cache, msg,
+                                             lambda x: self.fail(x),
+                                             self.encoding, 255)
+        iterator = iter(message_handler)
+        d = self.step(iterator, msg, "foo",
+                      headers={"content-type": tuple()})
+        d.addCallback(self.ensureException)
+
+    def testMissingTypeHeader(self):
+        msg = "http://foo/bar"
+        message_handler = app.MessageHandler(self.clock, self.hit_cache,
+                                             self.miss_cache, msg,
+                                             lambda x: self.fail(x),
+                                             self.encoding, 255)
+        iterator = iter(message_handler)
+        d = self.step(iterator, msg, "foo",
+                      headers={})
         d.addCallback(self.ensureException)
 
     def ensureException(self, e):
@@ -139,10 +161,9 @@ class TestMessageHandler(unittest.TestCase):
         self.assertEqual(len(errors), 1)
 
 
-    def step(self, iterator, url, title, code=None, override_headers=None):
-        headers = {"content-type": ("text/html;utf-8",)}
-        if override_headers:
-            headers.update(override_headers)
+    def step(self, iterator, url, title, code=None, headers=None):
+        if headers is None:
+            headers = {"content-type": ("text/html;utf-8",)}
         self.output = "title: %s" % title
         app.treq = MockTreq(url, self.template.substitute(title=title),
                             headers=headers, code=code)

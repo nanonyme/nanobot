@@ -67,9 +67,12 @@ class UrlHandler(object):
     def handle_response(self, response, handle_body):
         if response.code != 200:
             raise AppException("Response code %d" % response.code)
-        headers = response.headers.getRawHeaders("Content-Type")
-        if not headers:
+        try:
+            headers = response.headers.getRawHeaders("Content-Type")
+        except KeyError:
             raise AppException("No Content-Type")
+        if not headers:
+            raise AppException("Empty Content-Type")
         else:
             header = headers[0]
             log.msg("Header line %s" % header)

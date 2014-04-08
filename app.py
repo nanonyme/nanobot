@@ -62,7 +62,7 @@ class UrlHandler(object):
             self.bytes += data_len
             self.parser.feed(data)
         else:
-            self.d.cancel()
+            self.connection.cancel()
 
     def handle_response(self, response, handle_body):
         if response.code != 200:
@@ -89,7 +89,8 @@ class UrlHandler(object):
             if encoding:
                 log.msg("Using encoding %s to handle response" % encoding)            
             self.parser = self.parser_class()
-            return treq.collect(response, self.feed)
+            self.connection = treq.collect(response, self.feed)
+            return self.connection
 
     def get_title(self, url):
         d = treq.head(url, timeout=30, headers=self.headers)
@@ -99,8 +100,7 @@ class UrlHandler(object):
         d.addCallback(lambda _: self.parser.close())
         d.addCallback(lambda root: root.xpath("//title")[0].text)
         d.addCallback(lambda title: " ".join(title.split()))
-        self.d = d
-        return self.d
+        return d
 
 
 class MessageHandler(object):

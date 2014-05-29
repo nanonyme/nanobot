@@ -127,8 +127,12 @@ class ApiProxy(pb.Root):
 
     def __iter__(self):
         while True:
-            if not self.app or not self.queue:
-                log.msg("Pausing execution")
+            if not self.app:
+                log.msg("Pausing execution, no app")
+                self.running = False
+                break
+            elif not self.queue:
+                log.msg("Pausing execution, queue empty")
                 self.running = False
                 break
             else:
@@ -181,7 +185,11 @@ class NanoBot(object):
 
     def run(self):
         factory = pb.PBServerFactory(self.api)
-        self.endpoint.listen(factory)
+        d = self.endpoint.listen(factory)
+        def stop(e):
+            log.err(e)
+            self._reactor.stop()
+        d.addErrback(stop)
         self.reconnect_app()
         self._init_connections()
 

@@ -95,11 +95,19 @@ class UrlHandler(object):
     def get_title(self, url):
         d = treq.head(url, timeout=30, headers=self.headers)
         d.addCallback(self.handle_response, handle_body=False)
-        d.addCallback(lambda _: treq.get(url, timeout=30, headers=self.headers))
+        @d.addCallback
+        def trigger_get(ignored):
+            return treq.get(url, timeout=30, headers=self.headers)
         d.addCallback(self.handle_response, handle_body=True)
-        d.addCallback(lambda _: self.parser.close())
-        d.addCallback(lambda root: root.xpath("//title")[0].text)
-        d.addCallback(lambda title: " ".join(title.split()))
+        @d.addCallback
+        def obtain_tree_root(ignored):
+            return self.parser.close()
+        @d.addCallback
+        def extract_title(root):
+            return root.xpath("//title")[0].text
+        @d.addCallback
+        def remove_extra_spaces(title):
+            return " ".join(title.split())
         return d
 
 
@@ -124,7 +132,9 @@ class MessageHandler(object):
             if Levenshtein.distance(urlparse.urlparse(url).path, title) > 7:
                 log.msg("Will try to send title as a message")
                 d = self._callback("title: %s" % title)
-                d.addCallback(lambda _:task.deferLater(self._reactor, 2, defer.succeed, None))
+                @d.addCallback
+                def postpone_next_title(ignored):
+                    return task.deferLater(self._reactor, 2, defer.succeed, None)
                 return d
 
     def fail(self, err, url):

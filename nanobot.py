@@ -6,7 +6,9 @@ import sys
 from collections import deque
 from twisted.python import log
 
+
 class RemoteProtocol(pb.Referenceable):
+
     def __init__(self, protocol):
         self.protocol = protocol
 
@@ -19,6 +21,7 @@ class RemoteProtocol(pb.Referenceable):
     def remote_leave(self, channel, reason):
         self.protocol.leave(channel, reason)
 
+
 class NanoBotProtocol(object, irc.IRCClient):
     ping_delay = 180
 
@@ -30,11 +33,11 @@ class NanoBotProtocol(object, irc.IRCClient):
     @property
     def channels(self):
         return self.server.channels
-    
+
     def connectionMade(self):
         irc.IRCClient.connectionMade(self)
         log.msg("Connected to %s" % self.server.hostname)
-        
+
     def signedOn(self):
         irc.IRCClient.signedOn(self)
         for channel in self.channels:
@@ -60,8 +63,10 @@ class NanoBotProtocol(object, irc.IRCClient):
             self.bot.api.callRemote("handlePublicMessage", ref, user, channel,
                                     message, self.server.encoding, max_len)
 
+
 class ServerConnection(protocol.ReconnectingClientFactory):
     protocol = NanoBotProtocol
+
     def __init__(self, reactor, network_config, bot):
         self._reactor = reactor
         self.bot = bot
@@ -109,6 +114,7 @@ class ServerConnection(protocol.ReconnectingClientFactory):
 
 
 class ApiProxy(pb.Root):
+
     def __init__(self):
         self.app = None
         self.queue = deque()
@@ -123,7 +129,6 @@ class ApiProxy(pb.Root):
             log.msg("Scheduling")
             self.running = True
             task.coiterate(iter(self))
-
 
     def __iter__(self):
         while True:
@@ -141,7 +146,6 @@ class ApiProxy(pb.Root):
                 d.addErrback(self._fail)
                 yield d
 
-
     def _fail(self, exc):
         self.app = None
         log.err(exc)
@@ -151,7 +155,9 @@ class ApiProxy(pb.Root):
         self.app = app
         self.run()
 
+
 class ProcessProtocol(protocol.ProcessProtocol):
+
     def __init__(self, bot):
         self.bot = bot
         self.logs = []
@@ -179,20 +185,20 @@ class NanoBot(object):
             self.config = json.load(f)
         log.startLogging(open(self.core_config["log_file"], "a"))
         self.api = ApiProxy()
+        master_endpoint = str(self.core_config["masterEndpoint"])
         self.endpoint = endpoints.serverFromString(self._reactor,
-                                                   str(self.core_config["masterEndpoint"]))
-
+                                                   master_endpoint)
 
     def run(self):
         factory = pb.PBServerFactory(self.api)
         d = self.endpoint.listen(factory)
+
         def stop(e):
             log.err(e)
             self._reactor.stop()
         d.addErrback(stop)
         self.reconnect_app()
         self._init_connections()
-
 
     def _init_connections(self):
         log.msg("Setting up networks")
@@ -208,7 +214,6 @@ class NanoBot(object):
         if not self.exiting:
             return task.deferLater(self._reactor, 1, self._do_reconnect)
 
-
     def _do_reconnect(self):
         log.msg("Starting app logic layer and telling it to connect")
         self._proc = self._reactor.spawnProcess(ProcessProtocol(self),
@@ -216,7 +221,6 @@ class NanoBot(object):
                                                 args=[sys.executable,
                                                       "app.py"],
                                                 env={"CONFIG": "config.json"})
-            
 
     @property
     def core_config(self):
@@ -230,13 +234,14 @@ class NanoBot(object):
 
     @property
     def realname(self):
-        return self.core_config.get('realname', u'https://bitbucket.org/nanonyme/nanobot')
+        return self.core_config.get('realname',
+                                    u'https://bitbucket.org/nanonyme/nanobot')
 
     def shutdown(self):
         self.exiting = True
         if self._proc:
             self._proc.signalProcess('KILL')
-        
+
 
 def main():
     from twisted.internet import reactor

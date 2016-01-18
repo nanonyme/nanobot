@@ -12,7 +12,7 @@ import iptools
 import json
 import sqlite3
 import codecs
-
+import simple_eval
 
 class AppException(Exception):
     pass
@@ -219,12 +219,12 @@ class API(pb.Referenceable):
     def remote_handlePublicMessage(self, protocol, user, channel, message,
                                    encoding, max_line_length):
         try:
+            callback = functools.partial(
+                protocol.callRemote, "msg", channel)
             if message.startswith("!"):
                 return handleCommand(protocol, user, channel, message[1:],
-                                     encoding, max_line_length)
+                                     encoding, max_line_length, callback)
             else:
-                callback = functools.partial(
-                    protocol.callRemote, "msg", channel)
                 handler = MessageHandler(self.reactor, self.good_urls,
                                          self.bad_urls, message, callback,
                                          encoding, max_line_length)
@@ -245,7 +245,8 @@ user_query = ("select roles.name from roles where roles.oid in "
               "natural join userroles where usermask.mask=?);")
 
 
-def handleCommand(protocol, user, channel, message, encoding, max_line_length):
+def handleCommand(protocol, user, channel, message, encoding, max_line_length,
+                  callback):
     command, _, suffix = message.partition(" ")
     with sqlite3.connect(config["core"]["db"]) as conn:
         cur = conn.cursor()
@@ -257,6 +258,9 @@ def handleCommand(protocol, user, channel, message, encoding, max_line_length):
                 reactor.stop()
             else:
                 log.msg("User %s tried to do code reload" % user)
+        elif command == "eval":
+            truth, expr = suffix.split(":")
+            callback(simple_eval.eval_bool(expr, truth))
         elif command == "join":
             channel, _, password = suffix.partition(" ")
             if not password:

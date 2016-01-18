@@ -260,7 +260,8 @@ def handleCommand(protocol, user, channel, message, encoding, max_line_length,
                 log.msg("User %s tried to do code reload" % user)
         elif command == "eval":
             truth, expr = suffix.split(":")
-            callback(simple_eval.eval_bool(expr, truth))
+            truth = [s.strip() for s in truth.split(",")]
+            callback("Result: %s" % simple_eval.eval_bool(expr, truth))
         elif command == "join":
             channel, _, password = suffix.partition(" ")
             if not password:

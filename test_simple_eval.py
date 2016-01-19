@@ -9,24 +9,25 @@ class TestTokenizer(unittest.TestCase):
             output)
 
     def test_chars(self):
-        self.case("foo", ["foo"])
+        self.case("foo", [(0, "foo")])
 
     def test_and(self):
-        self.case("foo & bar", ["foo", "&", "bar"])
+        self.case("foo & bar", [(0, "foo"), (4, "&"), (6, "bar")])
 
     def test_os(self):
-        self.case("foo | bar", ["foo", "|", "bar"])
+        self.case("foo | bar", [(0, "foo"), (4, "|"), (6, "bar")])
 
     def test_negation(self):
-        self.case("~foo", ["~", "foo"])
+        self.case("~foo", [(0, "~"), (1, "foo")])
 
     def test_parens(self):
-        self.case("(a)", ["(", "a", ")"])
+        self.case("(a)", [(0, "("), (1, "a"), (2, ")")])
     
     def test_complex(self):
-        self.case("~(x&y)|(~x&~y)", ["~", "(", "x",
-            "&", "y", ")", "|", "(", "~", "x", "&",
-            "~", "y", ")"])
+        self.case("~(x&y)|(~x&~y)", [
+            (0, "~"), (1, "("), (2, "x"), (3, "&"), (4, "y"),
+            (5, ")"), (6, "|"), (7, "("), (8, "~"), (9, "x"),
+            (10, "&"), (11, "~"), (12, "y"), (13, ")")])
 
 class TestBoolEval(unittest.TestCase):
 
@@ -67,8 +68,11 @@ class TestBoolEval(unittest.TestCase):
         self.assertFalse(simple_eval.eval_bool("foo|bar", ()))
 
     def test_demorgan(self):
-        self.assertFalse(simple_eval.eval_bool("~(foo&bar)&~(~foo|~bar)", 
-            ("foo", "bar")))
+        expr = "~(foo&bar)&~(~foo|~bar)"
+        self.assertFalse(simple_eval.eval_bool(expr, 
+                                               ("foo", "bar")
+                                               )
+                         )
 
     def test_bad_input(self):
         with self.assertRaises(ValueError):

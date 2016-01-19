@@ -261,7 +261,12 @@ def handleCommand(protocol, user, channel, message, encoding, max_line_length,
         elif command == "eval":
             truth, expr = suffix.split(":")
             truth = [s.strip() for s in truth.split(",")]
-            callback("Result: %s" % simple_eval.eval_bool(expr, truth))
+            try:
+                ret = simple_eval.eval_bool(expr, truth)
+            except simple_eval.EvalError as e:
+                callback(str(e))
+            else:
+                callback("Result: %s" % ret)
         elif command == "join":
             channel, _, password = suffix.partition(" ")
             if not password:

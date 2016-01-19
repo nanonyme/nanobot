@@ -14,6 +14,9 @@ BOOL_SYNTAX = {
 IDENTIFIER = string.ascii_letters + "_"
 WHITESPACE = " \t\r\n"
 
+class EvalError(ValueError):
+    pass
+
 def tokenize(input_text, tokens, whitespace):
     max_len = max(len(token) for token in tokens)
     buf = ""
@@ -27,7 +30,7 @@ def tokenize(input_text, tokens, whitespace):
                 buf = ""
             yield i, c
         elif c not in IDENTIFIER:
-            raise ValueError("Invalid character at position %s" % i)
+            raise EvalError("Invalid character at position %s" % i)
         else:
             if not buf:
                 buf_pos = i
@@ -46,7 +49,7 @@ def infix_to_postfix(tokens, syntax):
                     pos, token = stack.pop()
                 except IndexError:
                     fmt = "Invalid token %s at pos %s"
-                    raise ValueError(fmt % (token, pos))
+                    raise EvalError(fmt % (token, pos))
                 if token == LEFT_PAREN:
                     break
                 else:
@@ -76,7 +79,7 @@ def eval_bool(input, truths):
             try:
                 pos_sym, sym = stack.pop()
             except IndexError:
-                raise ValueError(s)
+                raise EvalError(s)
             else:
                 stack.append((pos_sym, not sym))
         elif token in BOOL_SYNTAX:
@@ -84,16 +87,16 @@ def eval_bool(input, truths):
                 pos_a, a = stack.pop()
                 pos_b, b = stack.pop()
             except IndexError:
-                raise ValueError(s)
+                raise EvalError(s)
             else:
                 if a in BOOL_SYNTAX or b in BOOL_SYNTAX:
-                    raise ValueError(s)
+                    raise EvalError(s)
                 if token == BOOL_AND:
                     stack.append((pos_a, a and b))
                 elif token == BOOL_OR:
                     stack.append((pos_a, a or b))
                 else:
-                    raise ValueError(s)
+                    raise EvalError(s)
         else:
             stack.append((pos, True if token in truths else False))
     pos, token = stack.pop()

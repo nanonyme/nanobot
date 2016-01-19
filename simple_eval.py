@@ -45,8 +45,8 @@ def infix_to_postfix(tokens, syntax):
                 try:
                     pos, token = stack.pop()
                 except IndexError:
-                    fmt = "Invalid right paren at pos %s"
-                    raise ValueError(fmt % pos)
+                    fmt = "Invalid token %s at pos %s"
+                    raise ValueError(fmt % (token, pos))
                 if token == LEFT_PAREN:
                     break
                 else:
@@ -71,6 +71,7 @@ def eval_bool(input, truths):
     tokens = tokenize(input, BOOL_SYNTAX, WHITESPACE)
     tokens = infix_to_postfix(tokens, BOOL_SYNTAX)
     for pos, token in tokens:
+        s = "Invalid token %s at position %s" % (token, pos)
         if token == BOOL_NOT:
             try:
                 pos_sym, sym = stack.pop()

@@ -15,7 +15,11 @@ IDENTIFIER = string.ascii_letters + "_"
 WHITESPACE = " \t\r\n"
 
 class EvalError(ValueError):
-    pass
+    def __init__(self, position, token):
+        self.position = position
+        self.token = token
+        s = "Invalid token %s at position %s"
+        super(EvalError, self).__init__(s % (self.token, self.position))
 
 def tokenize(input_text, tokens, whitespace):
     max_len = max(len(token) for token in tokens)
@@ -23,14 +27,16 @@ def tokenize(input_text, tokens, whitespace):
     buf_pos = -1
     for i, c in enumerate(input_text):
         if c in whitespace:
-            continue
+            if buf:
+                yield buf_pos, buf
+                buf = ""
         elif c in tokens:
             if buf:
                 yield buf_pos, buf
                 buf = ""
             yield i, c
         elif c not in IDENTIFIER:
-            raise EvalError("Invalid character at position %s" % i)
+            raise EvalError(i, c)
         else:
             if not buf:
                 buf_pos = i
@@ -48,8 +54,7 @@ def infix_to_postfix(tokens, syntax):
                 try:
                     pos, token = stack.pop()
                 except IndexError:
-                    fmt = "Invalid token %s at pos %s"
-                    raise EvalError(fmt % (token, pos))
+                    raise EvalError(pos, token)
                 if token == LEFT_PAREN:
                     break
                 else:
@@ -73,13 +78,13 @@ def eval_bool(input, truths):
     stack = []
     tokens = tokenize(input, BOOL_SYNTAX, WHITESPACE)
     tokens = infix_to_postfix(tokens, BOOL_SYNTAX)
+    tokens = list(tokens)
     for pos, token in tokens:
-        s = "Invalid token %s at position %s" % (token, pos)
         if token == BOOL_NOT:
             try:
                 pos_sym, sym = stack.pop()
             except IndexError:
-                raise EvalError(s)
+                raise EvalError(pos, token)
             else:
                 stack.append((pos_sym, not sym))
         elif token in BOOL_SYNTAX:
@@ -87,7 +92,7 @@ def eval_bool(input, truths):
                 pos_a, a = stack.pop()
                 pos_b, b = stack.pop()
             except IndexError:
-                raise EvalError(s)
+                raise EvalError(pos, token)
             else:
                 if a in BOOL_SYNTAX or b in BOOL_SYNTAX:
                     raise EvalError(s)
@@ -96,8 +101,10 @@ def eval_bool(input, truths):
                 elif token == BOOL_OR:
                     stack.append((pos_a, a or b))
                 else:
-                    raise EvalError(s)
+                    raise EvalError(pos, token)
         else:
             stack.append((pos, True if token in truths else False))
     pos, token = stack.pop()
+    if stack:
+        raise ValueError(pos, token)
     return token

@@ -66,7 +66,7 @@ def infix_to_postfix(tokens, syntax):
                 pass
             else:
                 if next_token in syntax:
-                    if token == next_token:
+                    if syntax[next_token] == syntax[token]:
                         raise EvalError(pos, token)
                     elif syntax[next_token] > syntax[token]:
                         yield stack.pop()

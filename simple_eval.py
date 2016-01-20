@@ -106,5 +106,5 @@ def eval_bool(input, truths):
             stack.append((pos, True if token in truths else False))
     pos, token = stack.pop()
     if stack:
-        raise ValueError(pos, token)
+        raise EvalError(pos, token)
     return token

@@ -61,12 +61,14 @@ def infix_to_postfix(tokens, syntax):
                     yield pos, token
         elif token in syntax:
             try:
-                pos, item = stack[-1]
+                next_pos, next_token = stack[-1]
             except IndexError:
                 pass
             else:
-                if item in syntax:
-                    if syntax[item] > syntax[token]:
+                if next_token in syntax:
+                    if token == next_token:
+                        raise EvalError(pos, token)
+                    elif syntax[next_token] > syntax[token]:
                         yield stack.pop()
             stack.append((pos, token))
         else:
@@ -74,11 +76,19 @@ def infix_to_postfix(tokens, syntax):
     while stack:
         yield stack.pop()
 
+def boolify(token, truths):
+    if token in truths:
+        return True
+    else:
+        return False
+
 def eval_bool(input, truths):
     stack = []
+    print "foo"
     tokens = tokenize(input, BOOL_SYNTAX, WHITESPACE)
     tokens = infix_to_postfix(tokens, BOOL_SYNTAX)
     tokens = list(tokens)
+    print tokens
     for pos, token in tokens:
         if token == BOOL_NOT:
             try:
@@ -96,6 +106,8 @@ def eval_bool(input, truths):
             else:
                 if a in BOOL_SYNTAX or b in BOOL_SYNTAX:
                     raise EvalError(s)
+                a = boolify(a, truths)
+                b = boolify(b, truths)
                 if token == BOOL_AND:
                     stack.append((pos_a, a and b))
                 elif token == BOOL_OR:
@@ -103,7 +115,7 @@ def eval_bool(input, truths):
                 else:
                     raise EvalError(pos, token)
         else:
-            stack.append((pos, True if token in truths else False))
+            stack.append((pos, token))
     pos, token = stack.pop()
     if stack:
         raise EvalError(pos, token)

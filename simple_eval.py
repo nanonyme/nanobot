@@ -86,11 +86,8 @@ def boolify(token, truths):
 
 def eval_bool(input, truths):
     stack = []
-    print "foo"
     tokens = tokenize(input, BOOL_SYNTAX, WHITESPACE)
     tokens = infix_to_postfix(tokens, BOOL_SYNTAX)
-    tokens = list(tokens)
-    print tokens
     for pos, token in tokens:
         if token == BOOL_NOT:
             try:

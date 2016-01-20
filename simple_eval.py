@@ -79,6 +79,8 @@ def infix_to_postfix(tokens, syntax):
 def boolify(token, truths):
     if token in truths:
         return True
+    elif token is True:
+        return True
     else:
         return False
 
@@ -96,7 +98,7 @@ def eval_bool(input, truths):
             except IndexError:
                 raise EvalError(pos, token)
             else:
-                stack.append((pos_sym, not sym))
+                stack.append((pos_sym, not boolify(sym, truths)))
         elif token in BOOL_SYNTAX:
             try:
                 pos_a, a = stack.pop()
@@ -119,4 +121,4 @@ def eval_bool(input, truths):
     pos, token = stack.pop()
     if stack:
         raise EvalError(pos, token)
-    return token
+    return boolify(token, truths)

@@ -112,7 +112,10 @@ class UrlHandler(object):
 
         @d.addCallback
         def remove_extra_spaces(title):
-            return " ".join(title.split())
+            if not title:
+                return ""
+            else:
+                return " ".join(title.split())
         return d
 
 

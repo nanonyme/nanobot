@@ -120,15 +120,14 @@ class UrlHandler(object):
         return d
 
 def dynsearch(l, s):
-    if not l:
-        return True
     a, b = l[0], l[1:]
-    if Levenshtein.distance(a, s) < 7:
-        return False
-    elif Levenshtein.distance("".join(b), s) < 7:
-        return False
+    if not b:
+        return Levenshtein.distance(a, s) >= 7
     else:
-        return dynsearch(b, s)
+        if not dynsearch(b, s):
+            return False
+        else:
+            return Levenshtein.distance("".join(b), s) >= 7
 
 def prepare_url(url):
     path = urllib.unquote(urlparse.urlparse(url).path).replace("-", "")

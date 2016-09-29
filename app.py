@@ -8,6 +8,7 @@ import lxml.html
 import re
 import Levenshtein
 import urlparse
+import urllib
 import iptools
 import json
 import sqlite3
@@ -118,6 +119,26 @@ class UrlHandler(object):
                 return " ".join(title.split())
         return d
 
+def dynsearch(l, s):
+    if l and not s or not l and s:
+        return True
+    a, b = l[0], l[1:]
+    if Levenshtein.distance(a, s) < 7:
+        return False
+    elif Levenshtein.distance("".join(b), s) < 7:
+        return False
+    else:
+        return dynsearch(b, s)
+
+def prepare_url(url):
+    path = urllib.unquote(urlparse.urlparse(url).path).replace("-", "")
+    path = path.replace(" ", "").replace("+", "").lower()
+    path = path.rstrip("0123456789")
+    return path.split("/")
+
+def prepare_title(title):
+    title = title.replace("+", "").replace(" ", "").lower()
+    return title.split("-")[0]
 
 class MessageHandler(object):
 
@@ -138,7 +159,7 @@ class MessageHandler(object):
             title = title.encode(self._encoding)
             self._hits.update(url, title)
             log.msg("Got title %s" % title)
-            if Levenshtein.distance(urlparse.urlparse(url).path, title) > 7:
+            if dynsearch(prepare_url(url), prepare_title(title)): 
                 log.msg("Will try to send title as a message")
                 d = self._callback("title: %s" % title)
 

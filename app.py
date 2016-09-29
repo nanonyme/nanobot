@@ -120,9 +120,7 @@ class UrlHandler(object):
         return d
 
 def dynsearch(l, s):
-    if not s:
-        return False
-    elif not l:
+    if not l:
         return True
     a, b = l[0], l[1:]
     if Levenshtein.distance(a, s) < 7:

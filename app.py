@@ -121,7 +121,7 @@ class UrlHandler(object):
 
 def same_check(a, s):
     if len(s) < 14:
-        return a == s
+        return a != s
     else:
         return Levenshtein.distance(a, s) >= 7
 
@@ -164,7 +164,7 @@ class MessageHandler(object):
             title = title.encode(self._encoding)
             self._hits.update(url, title)
             log.msg("Got title %s" % title)
-            if True:#dynsearch(prepare_url(url), prepare_title(title)): 
+            if dynsearch(prepare_url(url), prepare_title(title)): 
                 log.msg("Will try to send title as a message")
                 d = self._callback("title: %s" % title)
 

@@ -119,15 +119,21 @@ class UrlHandler(object):
                 return " ".join(title.split())
         return d
 
+def same_check(a, s):
+    if len(s) < 14:
+        return a == s
+    else:
+        return Levenshtein.distance(a, s) >= 7
+
 def dynsearch(l, s):
     a, b = l[0], l[1:]
     if not b:
-        return Levenshtein.distance(a, s) >= 7
+        return same_check(a, s)
     else:
         if not dynsearch(b, s):
             return False
         else:
-            return Levenshtein.distance("".join(b), s) >= 7
+            return same_check("".join(b), s)
 
 def prepare_url(url):
     path = urllib.unquote(urlparse.urlparse(url).path).replace("-", "")
@@ -158,7 +164,7 @@ class MessageHandler(object):
             title = title.encode(self._encoding)
             self._hits.update(url, title)
             log.msg("Got title %s" % title)
-            if dynsearch(prepare_url(url), prepare_title(title)): 
+            if True:#dynsearch(prepare_url(url), prepare_title(title)): 
                 log.msg("Will try to send title as a message")
                 d = self._callback("title: %s" % title)
 

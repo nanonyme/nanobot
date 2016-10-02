@@ -120,7 +120,7 @@ class UrlHandler(object):
         return d
 
 def same_check(a, s):
-    if len(s) < 14:
+    if len(a) < 14 or len(s) < 14:
         return a != s
     else:
         return Levenshtein.distance(a, s) >= 7

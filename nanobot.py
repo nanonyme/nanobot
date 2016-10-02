@@ -141,7 +141,6 @@ class ApiProxy(pb.Root):
                 self.running = False
                 break
             else:
-                self.app = app
                 args, kwargs = self.queue.popleft()
                 d = self.app.callRemote(*args, **kwargs)
                 d.addErrback(log.err)

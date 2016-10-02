@@ -119,21 +119,24 @@ class UrlHandler(object):
                 return " ".join(title.split())
         return d
 
-def same_check(a, s):
+def difference_check(a, s):
     if len(a) < 14 or len(s) < 14:
-        return a != s
+        if len(a) != len(s):
+            return True
+        else:
+            return a != s
     else:
         return Levenshtein.distance(a, s) >= 7
 
 def dynsearch(l, s):
     a, b = l[0], l[1:]
     if not b:
-        return same_check(a, s)
+        return difference_check(a, s)
     else:
         if not dynsearch(b, s):
             return False
         else:
-            return same_check("".join(b), s)
+            return difference_check("".join(b), s)
 
 def prepare_url(url):
     path = urllib.unquote(urlparse.urlparse(url).path).replace("-", "")

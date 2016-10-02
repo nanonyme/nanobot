@@ -144,11 +144,7 @@ class ApiProxy(pb.Root):
                 self.app = app
                 args, kwargs = self.queue.popleft()
                 d = self.app.callRemote(*args, **kwargs)
-                @d.addErrback
-                def handle_failure(exc):
-                    if self.app is app:
-                        self.app = None
-                    log.err(exc)              
+                d.addErrback(log.err)
                 yield d
 
     def remote_register(self, app):
@@ -156,6 +152,8 @@ class ApiProxy(pb.Root):
         self.app = app
         self.run()
 
+    def disconnect(self):
+        self.app = None
 
 class ProcessProtocol(protocol.ProcessProtocol):
 
@@ -170,7 +168,6 @@ class ProcessProtocol(protocol.ProcessProtocol):
         log.msg("Process exited with status code %s" % status)
         log.msg("".join(self.logs))
         return self.bot.reconnect_app()
-
 
 class NanoBot(object):
     app = None
@@ -213,6 +210,7 @@ class NanoBot(object):
     def reconnect_app(self):
         log.msg("App start requested")
         if not self.exiting:
+            self.api.disconnect()
             return task.deferLater(self._reactor, 1, self._do_reconnect)
 
     def _do_reconnect(self):

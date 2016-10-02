@@ -157,12 +157,13 @@ class MessageHandler(object):
         self._encoding = encoding
         self._max_len = max_len
 
-    def success(self, title, url):
+    def success(self, title, url, new_url):
         if len(title) > self._max_len:
             title = title[:self._max_len]
         if title:
             title = title.encode(self._encoding)
-            self._hits.update(url, title)
+            if new_url:
+                self._hits.update(url, title)
             log.msg("Got title %s" % title)
             if dynsearch(prepare_url(url), prepare_title(title)): 
                 log.msg("Will try to send title as a message")
@@ -193,9 +194,11 @@ class MessageHandler(object):
                 handler = UrlHandler(
                     max_body=2 * 1024 ** 2, parser_class=lxml.html.HTMLParser)
                 d = handler.get_title(url)
-                d.addCallback(self.success, url)
+                d.addCallback(self.success, url, True)
                 d.addErrback(self.fail, url)
                 yield d
+            else:
+                self.success(url, title, False)
 
 
 class UrlCache(object):

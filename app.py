@@ -183,14 +183,15 @@ class MessageHandler(object):
     def __iter__(self):
         for m in re.finditer("(https?://[^ ]+)", self._message):
             url = m.group(0)
-            log.msg("Fetching title for URL %s" % url)
             if not acceptable_netloc(urlparse.urlparse(url).netloc):
                 continue
             if self._misses.fetch(url):
-                log.msg("Skipped")
+                log.msg(("Skipped title check for URL %s because of "
+                    "previous failures"))
                 continue
             title = self._hits.fetch(url)
             if title is None:
+                log.msg("Cache miss for URL %s" % url)
                 handler = UrlHandler(
                     max_body=2 * 1024 ** 2, parser_class=lxml.html.HTMLParser)
                 d = handler.get_title(url)
@@ -198,6 +199,7 @@ class MessageHandler(object):
                 d.addErrback(self.fail, url)
                 yield d
             else:
+                log.msg("Cache hit for URL %s" % url)
                 self.success(url, title, False)
 
 
@@ -273,7 +275,7 @@ class API(pb.Referenceable):
 
 
 user_query = ("select roles.name from roles where roles.oid in "
-              "(select userroles.oid from (user natural join usermask)"
+              "(select userroles.oid from (users natural join usermask)"
               "natural join userroles where usermask.mask=?);")
 
 

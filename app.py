@@ -140,12 +140,12 @@ def dynsearch(l, s):
 
 def prepare_url(url):
     path = urllib.unquote(urlparse.urlparse(url).path).replace("-", "")
-    path = path.replace(" ", "").replace("+", "").lower()
+    path = path.replace(" ", "").replace("+", "").replace("_", "").lower()
     path = path.rstrip("0123456789")
     return path.split("/")
 
 def prepare_title(title):
-    title = title.replace("+", "").replace(" ", "").lower()
+    title = title.replace("+", "").replace(" ", "").replace("_", "").lower()
     return title.split("-")[0]
 
 class MessageHandler(object):

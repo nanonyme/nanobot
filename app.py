@@ -203,7 +203,7 @@ class MessageHandler(object):
                 yield d
             else:
                 log.msg("Cache hit for URL %s" % url)
-                self.success(url, title, False)
+                self.success(title, url, False)
 
 
 class UrlCache(object):

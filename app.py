@@ -97,7 +97,8 @@ class UrlHandler(object):
             return self.connection
 
     def get_title(self, url):
-        d = treq.head(url, timeout=30, headers=self.headers)
+        d = defer.maybeDeferred(treq.head, url, timeout=30,
+                                headers=self.headers)
         d.addCallback(self.handle_response, handle_body=False)
 
         @d.addCallback

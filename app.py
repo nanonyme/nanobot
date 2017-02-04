@@ -32,6 +32,8 @@ config = {}
 
 def acceptable_netloc(hostname):
     acceptable = True
+    if re.search("[^:.\w]"):
+        return False
     try:
         if hostname in INTERNAL_IPS:
             acceptable = False

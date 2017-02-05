@@ -115,13 +115,14 @@ class ServerConnection(protocol.ReconnectingClientFactory):
 
 class ApiProxy(pb.Root):
 
-    def __init__(self):
+    def __init__(self, reactor):
+        self.reactor = reactor
         self.app = None
         self.queue = deque()
         self.running = False
 
     def callRemote(self, *args, **kwargs):
-        self.queue.append((args, kwargs))
+        self.queue.append((self.reactor.seconds(), args, kwargs))
         self.run()
 
     def run(self):
@@ -139,10 +140,13 @@ class ApiProxy(pb.Root):
                 self.running = False
                 break
             else:
-                args, kwargs = self.queue.popleft()
-                d = self.app.callRemote(*args, **kwargs)
-                d.addErrback(log.err)
-                yield d
+                seconds, args, kwargs = self.queue.popleft()
+                if self.reactor.seconds() - seconds < 2*60:
+                    d = self.app.callRemote(*args, **kwargs)
+                    d.addErrback(log.err)
+                    yield d
+                else:
+                    log.msg("Message older than 2 minutes in backlog, pruning")
 
     def remote_register(self, app):
         log.msg("Got registration request for %s" % str(app))
@@ -179,7 +183,7 @@ class NanoBot(object):
         with open(config_filename) as f:
             self.config = json.load(f)
         log.startLogging(open(self.core_config["log_file"], "a"))
-        self.api = ApiProxy()
+        self.api = ApiProxy(self.reactor)
         master_endpoint = str(self.core_config["masterEndpoint"])
         self.endpoint = endpoints.serverFromString(self._reactor,
                                                    master_endpoint)

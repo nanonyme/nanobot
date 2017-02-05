@@ -191,7 +191,7 @@ class MessageHandler(object):
                 continue
             if self._misses.fetch(url):
                 log.msg(("Skipped title check for URL %s because of "
-                    "previous failures"))
+                    "previous failures" % url))
                 continue
             title = self._hits.fetch(url)
             if title is None:

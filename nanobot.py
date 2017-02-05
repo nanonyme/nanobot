@@ -183,7 +183,7 @@ class NanoBot(object):
         with open(config_filename) as f:
             self.config = json.load(f)
         log.startLogging(open(self.core_config["log_file"], "a"))
-        self.api = ApiProxy(self.reactor)
+        self.api = ApiProxy(self._reactor)
         master_endpoint = str(self.core_config["masterEndpoint"])
         self.endpoint = endpoints.serverFromString(self._reactor,
                                                    master_endpoint)

@@ -246,6 +246,7 @@ class UrlCache(object):
 
 
 class API(pb.Referenceable):
+    STALENESS_LIMIT = 24*60*60
 
     def __init__(self, reactor):
         self.reactor = reactor
@@ -254,8 +255,17 @@ class API(pb.Referenceable):
         self.bad_urls = UrlCache(self.reactor, expiration=60)
         self.bad_urls.enable()
 
+    def _staleness_check(self, timestamp):
+        if self.reactor.seconds() - timestamp > self.STALENESS_LIMIT:
+            log.msg("Message stale, ignoring")
+            return True
+        else:
+            return False
+
     def remote_handlePublicMessage(self, protocol, user, channel, message,
-                                   encoding, max_line_length):
+                                   encoding, max_line_length, timestamp):
+        if self._staleness_check(timestamp):
+            return
         try:
             callback = functools.partial(
                 protocol.callRemote, "msg", channel)
@@ -271,7 +281,9 @@ class API(pb.Referenceable):
             log.err()
 
     def remote_handlePrivateMessage(self, protocol, user, channel, message,
-                                    encoding, max_line_length):
+                                    encoding, max_line_length, timestamp):
+        if self._staleness_check(timestamp):
+            return
         channel, _, _ = user.partition("!")
         return self.remote_handlePublicMessage(protocol, user, channel,
                                                message, encoding,

@@ -141,13 +141,10 @@ class ApiProxy(pb.Root):
                 break
             else:
                 seconds, args, kwargs = self.queue.popleft()
-                if self.reactor.seconds() - seconds < 2*60:
-                    d = self.app.callRemote(*args, **kwargs)
-                    d.addErrback(log.err)
-                    yield d
-                else:
-                    log.msg("Message older than 2 minutes in backlog, pruning")
-
+                d = self.app.callRemote(timestamp=seconds, *args, **kwargs)
+                d.addErrback(log.err)
+                yield d
+ 
     def remote_register(self, app):
         log.msg("Got registration request for %s" % str(app))
         self.app = app

@@ -126,18 +126,16 @@ class ApiProxy(pb.Root):
 
     def run(self):
         if not self.running:
-            log.msg("Scheduling")
             self.running = True
             task.coiterate(iter(self))
 
     def __iter__(self):
         while True:
             if not self.app:
-                log.msg("Pausing execution, no app")
+                log.msg("Messages in loop but no app is connected")
                 self.running = False
                 break
             elif not self.queue:
-                log.msg("Pausing execution, queue empty")
                 self.running = False
                 break
             else:

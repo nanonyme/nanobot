@@ -288,7 +288,8 @@ class API(pb.Referenceable):
         channel, _, _ = user.partition("!")
         return self.remote_handlePublicMessage(protocol, user, channel,
                                                message, encoding,
-                                               max_line_length)
+                                               max_line_length,
+                                               timestamp)
 
 
 user_query = ("select roles.name from roles where roles.oid in "

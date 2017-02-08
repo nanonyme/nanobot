@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from twisted.spread import pb
 from twisted.internet import endpoints, task, reactor, defer
 from twisted.python import log

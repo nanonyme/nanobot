@@ -148,7 +148,7 @@ def prepare_url(url):
 
 def prepare_title(title):
     title = title.replace("+", "").replace(" ", "").replace("_", "").lower()
-    return re.split("-–", title)[0]
+    return re.split("[-–]", title)[0]
 
 class MessageHandler(object):
 

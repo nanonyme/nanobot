@@ -22,7 +22,7 @@ class RemoteProtocol(pb.Referenceable):
         self.protocol.leave(channel, reason)
 
 
-class NanoBotProtocol(object, irc.IRCClient):
+class NanoBotProtocol(irc.IRCClient):
     ping_delay = 180
 
     def __init__(self, reactor, server, bot):
@@ -42,10 +42,9 @@ class NanoBotProtocol(object, irc.IRCClient):
         irc.IRCClient.signedOn(self)
         for channel in self.channels:
             if 'key' in channel:
-                self.join(channel['name'].encode(self.server.encoding),
-                          channel['key'].encode(self.server.encoding))
+                self.join(channel['name'], channel['key'])
             else:
-                self.join(channel['name'].encode(self.server.encoding))
+                self.join(channel['name'])
 
     def connectionLost(self, reason):
         log.msg("Connection to %s lost" % self.server.hostname)
@@ -58,10 +57,10 @@ class NanoBotProtocol(object, irc.IRCClient):
         max_len = self._safeMaximumLineLength(fmt) - len(fmt) - 50
         if channel == self.nickname:
             self.bot.api.callRemote("handlePrivateMessage", ref, user, channel,
-                                    message, self.server.encoding, max_len)
+                                    message, max_len)
         else:
             self.bot.api.callRemote("handlePublicMessage", ref, user, channel,
-                                    message, self.server.encoding, max_len)
+                                    message, max_len)
 
 
 class ServerConnection(protocol.ReconnectingClientFactory):
@@ -71,13 +70,14 @@ class ServerConnection(protocol.ReconnectingClientFactory):
         self._reactor = reactor
         self.bot = bot
         self.network_config = network_config
+        self.encoding = self.network_config.get('encoding', None)
 
     def buildProtocol(self, addr):
         protocol = self.protocol(self._reactor, server=self, bot=self.bot)
         if self.bot.nickname:
-            protocol.nickname = self.bot.nickname.encode(self.encoding)
+            protocol.nickname = self.bot.nickname
         if self.bot.realname:
-            protocol.realname = self.bot.realname.encode(self.encoding)
+            protocol.realname = self.bot.realname
         return protocol
 
     @property
@@ -100,17 +100,11 @@ class ServerConnection(protocol.ReconnectingClientFactory):
     def is_ssl(self):
         return bool(self.network_config.get('ssl', False))
 
-    @property
-    def encoding(self):
-        return self.network_config.get('encoding', 'utf-8')
-
     def connect(self):
         if self.is_ssl:
-            self._reactor.connectSSL(self.hostname.encode(self.encoding),
-                                     self.port, self)
+            self._reactor.connectSSL(self.hostname, self.port, self)
         else:
-            self._reactor.connectTCP(self.hostname.encode(self.encoding),
-                                     self.port, self)
+            self._reactor.connectTCP(self.hostname, self.port, self)
 
 
 class ApiProxy(pb.Root):
@@ -164,7 +158,7 @@ class ProcessProtocol(protocol.ProcessProtocol):
 
     def processExited(self, status):
         log.msg("Process exited with status code %s" % status)
-        log.msg("".join(self.logs))
+        log.msg(b"".join(self.logs))
         return self.bot.reconnect_app()
 
 class NanoBot(object):

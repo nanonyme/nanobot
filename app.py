@@ -8,8 +8,12 @@ import treq
 import lxml.html
 import re
 import Levenshtein
-import urlparse
-import urllib
+try:
+    from urllib import parse as urlparse
+    urllib = urlparse
+except ImportError:
+    import urlparse
+    import urllib
 import iptools
 import json
 import sqlite3
@@ -152,21 +156,18 @@ def prepare_title(title):
 
 class MessageHandler(object):
 
-    def __init__(self, reactor, hits, misses, message, callback,
-                 encoding, max_len):
+    def __init__(self, reactor, hits, misses, message, callback, max_len):
         self._callback = callback
         self._reactor = reactor
         self._message = message
         self._hits = hits
         self._misses = misses
-        self._encoding = encoding
         self._max_len = max_len
 
     def success(self, title, url, new_url):
         if len(title) > self._max_len:
             title = title[:self._max_len]
         if title:
-            title = title.encode(self._encoding)
             if new_url:
                 self._hits.update(url, title)
             log.msg("Got title %s" % title)
@@ -264,7 +265,7 @@ class API(pb.Referenceable):
             return False
 
     def remote_handlePublicMessage(self, protocol, user, channel, message,
-                                   encoding, max_line_length, timestamp):
+                                   max_line_length, timestamp):
         if self._staleness_check(timestamp):
             return
         try:
@@ -272,22 +273,22 @@ class API(pb.Referenceable):
                 protocol.callRemote, "msg", channel)
             if message.startswith("!"):
                 return handleCommand(protocol, user, channel, message[1:],
-                                     encoding, max_line_length, callback)
+                                     max_line_length, callback)
             else:
                 handler = MessageHandler(self.reactor, self.good_urls,
                                          self.bad_urls, message, callback,
-                                         encoding, max_line_length)
+                                         max_line_length)
                 return task.coiterate(iter(handler))
         except Exception:
             log.err()
 
     def remote_handlePrivateMessage(self, protocol, user, channel, message,
-                                    encoding, max_line_length, timestamp):
+                                    max_line_length, timestamp):
         if self._staleness_check(timestamp):
             return
         channel, _, _ = user.partition("!")
         return self.remote_handlePublicMessage(protocol, user, channel,
-                                               message, encoding,
+                                               message,
                                                max_line_length,
                                                timestamp)
 
@@ -297,7 +298,7 @@ user_query = ("select roles.name from roles where roles.oid in "
               "natural join userroles where usermask.mask=?);")
 
 
-def handleCommand(protocol, user, channel, message, encoding, max_line_length,
+def handleCommand(protocol, user, channel, message, max_line_length,
                   callback):
     command, _, suffix = message.partition(" ")
     with sqlite3.connect(config["core"]["db"]) as conn:

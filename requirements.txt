@@ -1,4 +1,4 @@
-Twisted
+Twisted[http2]
 git+git://github.com/dreid/treq.git@master
 lxml
 python-Levenshtein

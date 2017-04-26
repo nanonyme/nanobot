@@ -228,7 +228,7 @@ class UrlCache(object):
                          "timestamp": self._reactor.seconds()}
 
     def _valid(self):
-        for key, value in self._db.iteritems():
+        for key, value in self._db.items():
             if self._reactor.seconds() - value["timestamp"] < self._expiration:
                 yield key, value
 

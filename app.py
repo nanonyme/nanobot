@@ -215,13 +215,14 @@ class UrlCache(object):
         self._reactor = reactor
         self._expiration = expiration
         self._db = {}
-        self._reaper = None
+        self._reaper = task.LoopingCall(self._reap, clock=reactor)
 
     def fetch(self, key):
-        item = self._db.get(key)
-        if item is not None:
-            return item["value"]
-        return None
+        try:
+            value = self._db[key]["value"]
+        except KeyError:
+            value = None
+        return value
 
     def update(self, key, value):
         self._db[key] = {"value": value,
@@ -233,15 +234,12 @@ class UrlCache(object):
                 yield key, value
 
     def enable(self):
-        if self._reaper is None:
-            self._reaper = task.LoopingCall(self._reap)
-            self._reaper.clock = self._reactor
+        if not self._reaper.running:
             self._reaper.start(self._expiration, False)
 
     def disable(self):
-        if self._reaper is not None:
+        if self._reaper.running:
             self._reaper.stop()
-            self._reaper = None
 
     def _reap(self):
         self._db = dict(self._valid())

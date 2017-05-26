@@ -352,8 +352,6 @@ def register(root, reactor):
     return root.callRemote("register", API(reactor))
 
 if __name__ == "__main__":
-    from twisted.internet import asyncioreactor
-    asyncioreactor.install()
     from twisted.internet import reactor
     with open(environ["CONFIG"]) as f:
         config.update(json.load(f))

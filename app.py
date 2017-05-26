@@ -215,7 +215,7 @@ class UrlCache(object):
         self._reactor = reactor
         self._expiration = expiration
         self._db = {}
-        self._reaper = task.LoopingCall(self._reap, clock=reactor)
+        self._reaper = task.LoopingCall(self._reap)
 
     def fetch(self, key):
         try:
@@ -356,11 +356,13 @@ if __name__ == "__main__":
     with open(environ["CONFIG"]) as f:
         config.update(json.load(f))
     log.startLogging(open(config["core"]["log_file"], "a"))
-    appEndpoint = str(config["core"]["slaveEndpoint"])
-    client = endpoints.clientFromString(reactor, str(appEndpoint))
+    endpoint = endpoints.StandardIOEndpoint(reactor)
     factory = pb.PBClientFactory()
-    client.connect(factory)
-    d = factory.getRootObject()
-    d.addCallback(register, reactor)
-    d.addErrback(log_and_exit, reactor)
+    d = endpoint.listen(factory)
+    @d.addCallback
+    def initialize(_):
+        d = factory.getRootObject()
+        d.addCallback(register, reactor)
+        d.addErrback(log_and_exit, reactor)
+        return
     reactor.run()

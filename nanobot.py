@@ -1,6 +1,6 @@
 import json
 from twisted.words.protocols import irc
-from twisted.internet import protocol, task, endpoints
+from twisted.internet import protocol, task
 from twisted.spread import pb
 import sys
 from collections import deque
@@ -149,12 +149,13 @@ class ApiProxy(pb.Root):
 
 class ProcessProtocol(protocol.ProcessProtocol):
 
-    def __init__(self, bot):
+    def __init__(self, bot, broker_factory):
         self.bot = bot
         self.logs = []
+        self.broker = broker_factory.buildProtocol(None)
 
-    def errReceived(self, data):
-        self.logs.append(data)
+    def makeConnection(self, transport):
+        self.broker.makeConnection(transport)
 
     def processExited(self, status):
         log.msg("Process exited with status code %s" % status)
@@ -175,20 +176,12 @@ class NanoBot(object):
             self.config = json.load(f)
         log.startLogging(open(self.core_config["log_file"], "a"))
         self.api = ApiProxy(self._reactor)
-        master_endpoint = str(self.core_config["masterEndpoint"])
-        self.endpoint = endpoints.serverFromString(self._reactor,
-                                                   master_endpoint)
+        self.server_factory = pb.PBServerFactory(self.api)
 
     def run(self):
-        factory = pb.PBServerFactory(self.api)
-        d = self.endpoint.listen(factory)
 
-        def stop(e):
-            log.err(e)
-            self._reactor.stop()
-        d.addErrback(stop)
-        self.reconnect_app()
-        self._init_connections()
+        d = self.reconnect_app()
+        d.addCallback(lambda _: self._init_connections())
 
     def _init_connections(self):
         log.msg("Setting up networks")
@@ -207,7 +200,7 @@ class NanoBot(object):
 
     def _do_reconnect(self):
         log.msg("Starting app logic layer and telling it to connect")
-        self._proc = self._reactor.spawnProcess(ProcessProtocol(self),
+        self._proc = self._reactor.spawnProcess(ProcessProtocol(self, self.server_factory),
                                                 sys.executable,
                                                 args=[sys.executable,
                                                       "app.py"],

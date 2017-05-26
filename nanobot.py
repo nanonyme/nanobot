@@ -235,6 +235,8 @@ class NanoBot(object):
 
 
 def main():
+    from twisted.internet import asynciorector
+    asyncioreactor.install()
     from twisted.internet import reactor
     nanobot = NanoBot(reactor, "config.json")
     reactor.callWhenRunning(nanobot.run)

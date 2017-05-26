@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from twisted.spread import pb
-from twisted.internet import endpoints, task, reactor, defer
+from twisted.internet import endpoints, task, defer
 from twisted.python import log
 from os import environ
 import functools
@@ -352,6 +352,9 @@ def register(root, reactor):
     return root.callRemote("register", API(reactor))
 
 if __name__ == "__main__":
+    from twisted.internet import asyncioreactor
+    asyncioreactor.install()
+    from twisted.internet import reactor
     with open(environ["CONFIG"]) as f:
         config.update(json.load(f))
     log.startLogging(open(config["core"]["log_file"], "a"))

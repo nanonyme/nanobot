@@ -2,8 +2,6 @@
    "core": {
       "nickname": "foo",
       "realname": "bar",
-      "masterEndpoint": "unix:/path/to/nanobot/server.sock:mode=700:lockfile=0",
-      "slaveEndpoint": "unix:/path/to/nanobot/server.sock",
       "log_file": "/path/to/nanobot/nanobot.log",
       "db": "/path/to/nanobot/database.sql"
    },

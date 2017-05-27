@@ -157,6 +157,9 @@ class ProcessProtocol(protocol.ProcessProtocol):
     def makeConnection(self, transport):
         self.broker.makeConnection(transport)
 
+    def outReceived(self, data):
+        self.broker.dataReceived(data)
+
     def processExited(self, status):
         log.msg("Process exited with status code %s" % status)
         log.msg(b"".join(self.logs))
@@ -200,9 +203,10 @@ class NanoBot(object):
 
     def _do_reconnect(self):
         log.msg("Starting app logic layer and telling it to connect")
-        self._proc = self._reactor.spawnProcess(ProcessProtocol(self, self.server_factory),
+        self._proc = self._reactor.spawnProcess(ProcessProtocol(self,
+                                                                self.server_factory),
                                                 sys.executable,
-                                                args=[sys.executable,
+                                                args=[sys.executable, "-u",
                                                       "app.py"],
                                                 env={"CONFIG": "config.json"})
 

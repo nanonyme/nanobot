@@ -217,7 +217,8 @@ class UrlCache(object):
         self._reactor = reactor
         self._expiration = expiration
         self._db = {}
-        self._reaper = task.LoopingCall(self._reap, clock=self._reactor)
+        self._reaper = task.LoopingCall(self._reap)
+        self._reaper.clock = reactor
 
     def fetch(self, key):
         try:

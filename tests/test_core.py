@@ -88,7 +88,6 @@ class TestMessageHandler(unittest.TestCase):
         self.clock = task.Clock()        
         self.hit_cache = IgnorantCache()
         self.miss_cache = IgnorantCache()
-        self.encoding = "UTF-8"
         self.template = string.Template("""<html>
         <head>
         <title>${title}</title>
@@ -101,7 +100,7 @@ class TestMessageHandler(unittest.TestCase):
         message_handler = app.MessageHandler(self.clock, self.hit_cache,
                                              self.miss_cache, "foo bar",
                                              lambda x: self.fail(x),
-                                             self.encoding, 255)
+                                             255)
         d = next(iter(message_handler), None)
         self.assertIs(d, None, "Should not give any deferreds")
 
@@ -109,7 +108,7 @@ class TestMessageHandler(unittest.TestCase):
         message_handler = app.MessageHandler(self.clock, self.hit_cache,
                                              self.miss_cache, "gopher://foo/bar#baz",
                                              lambda x: self.fail(x),
-                                             self.encoding, 255)
+                                             255)
         d = next(iter(message_handler), None)
         self.assertIs(d, None, "Should not give any deferreds")
 
@@ -118,7 +117,7 @@ class TestMessageHandler(unittest.TestCase):
         message_handler = app.MessageHandler(self.clock, self.hit_cache,
                                              self.miss_cache, msg,
                                              lambda x: self.fail(x),
-                                             self.encoding, 255)
+                                             255)
         iterator = iter(message_handler)
         d = self.step(iterator, msg, "foo", code=400)
         d.addCallback(self.ensureException)
@@ -128,7 +127,7 @@ class TestMessageHandler(unittest.TestCase):
         message_handler = app.MessageHandler(self.clock, self.hit_cache,
                                              self.miss_cache, msg,
                                              lambda x: self.fail(x),
-                                             self.encoding, 255)
+                                             255)
         iterator = iter(message_handler)
         d = self.step(iterator, msg, "foo",
                       headers={"content-type": ("image/png",)})
@@ -139,7 +138,7 @@ class TestMessageHandler(unittest.TestCase):
         message_handler = app.MessageHandler(self.clock, self.hit_cache,
                                              self.miss_cache, msg,
                                              lambda x: self.fail(x),
-                                             self.encoding, 255)
+                                             255)
         iterator = iter(message_handler)
         d = self.step(iterator, msg, "foo",
                       headers={"content-type": tuple()})
@@ -150,7 +149,7 @@ class TestMessageHandler(unittest.TestCase):
         message_handler = app.MessageHandler(self.clock, self.hit_cache,
                                              self.miss_cache, msg,
                                              lambda x: self.fail(x),
-                                             self.encoding, 255)
+                                             255)
         iterator = iter(message_handler)
         d = self.step(iterator, msg, "foo",
                       headers={})
@@ -191,7 +190,7 @@ class TestMessageHandler(unittest.TestCase):
         message_handler = app.MessageHandler(self.clock, self.hit_cache,
                                              self.miss_cache, " ".join(urls),
                                              self.callback,
-                                             self.encoding, 255)
+                                             255)
         iterator = iter(message_handler)
         d = defer.succeed(None)
         for url in urls:

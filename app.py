@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from twisted.spread import pb
 from twisted.internet import endpoints, task, defer
-from twisted.python import log
 from os import environ
 import functools
 import treq
@@ -19,6 +18,9 @@ import json
 import sqlite3
 import codecs
 import simple_eval
+from twisted.logger import textFileLogObserver, globalLogPublisher, Logger
+
+log = Logger()
 
 class AppException(Exception):
     pass
@@ -82,7 +84,7 @@ class UrlHandler(object):
             raise AppException("Empty Content-Type")
         else:
             header = headers[0]
-            log.msg("Header line %s" % header)
+            log.info("Header line {header}", header=header)
             mime, _, encoding = header.partition(";")
             if encoding:
                 _, _, encoding = encoding.strip().partition("=")
@@ -94,7 +96,8 @@ class UrlHandler(object):
                 raise AppException("Mime %s not supported" % mime)
         if handle_body:
             if encoding:
-                log.msg("Using encoding %s to handle response" % encoding)
+                log.info("Using encoding {encoding} to handle response",
+                         encoding=encoding)
             self.parser = self.parser_class()
             self.connection = treq.collect(response, self.feed)
             return self.connection
@@ -170,9 +173,9 @@ class MessageHandler(object):
         if title:
             if new_url:
                 self._hits.update(url, title)
-            log.msg("Got title %s" % title)
+            log.info("Got title {title}", title=title)
             if dynsearch(prepare_url(url), prepare_title(title)): 
-                log.msg("Will try to send title as a message")
+                log.info("Will try to send title as a message")
                 d = self._callback("title: %s" % title)
 
                 @d.addCallback
@@ -182,9 +185,8 @@ class MessageHandler(object):
                 return d
 
     def fail(self, err, url):
-        log.msg("Adding the URL to temporary block list")
         self._misses.update(url, "miss")
-        log.err(err)
+        log.failure("Adding {url} to temporary block list", err, url=url)
 
     def __iter__(self):
         for m in re.finditer("(https?://[^ ]+)", self._message):
@@ -192,12 +194,12 @@ class MessageHandler(object):
             if not acceptable_netloc(urlparse.urlparse(url).netloc):
                 continue
             if self._misses.fetch(url):
-                log.msg(("Skipped title check for URL %s because of "
-                    "previous failures" % url))
+                log.info(("Skipped title check for URL {url} because of "
+                    "previous failures"), url=url)
                 continue
             title = self._hits.fetch(url)
             if title is None:
-                log.msg("Cache miss for URL %s" % url)
+                log.info("Cache miss for URL {url}", url=url)
                 handler = UrlHandler(
                     max_body=2 * 1024 ** 2, parser_class=lxml.html.HTMLParser)
                 d = handler.get_title(url)
@@ -205,7 +207,7 @@ class MessageHandler(object):
                 d.addErrback(self.fail, url)
                 yield d
             else:
-                log.msg("Cache hit for URL %s" % url)
+                log.info("Cache hit for URL {url}", url=url)
                 self.success(title, url, False)
 
 
@@ -257,7 +259,7 @@ class API(pb.Referenceable):
 
     def _staleness_check(self, timestamp):
         if self.reactor.seconds() - timestamp > self.STALENESS_LIMIT:
-            log.msg("Message stale, ignoring")
+            log.info("Message stale, ignoring")
             return True
         else:
             return False
@@ -278,7 +280,7 @@ class API(pb.Referenceable):
                                          max_line_length)
                 return task.coiterate(iter(handler))
         except Exception:
-            log.err()
+            log.failure("FIXME, runaway exception")
 
     def remote_handlePrivateMessage(self, protocol, user, channel, message,
                                     max_line_length, timestamp):
@@ -305,10 +307,10 @@ def handleCommand(protocol, user, channel, message, max_line_length,
         roles = [role[0] for role in res.fetchmany()]
         if command == "reincarnate":
             if "superadmin" in roles:
-                log.msg("Restarting app")
+                log.info("Restarting app")
                 reactor.stop()
             else:
-                log.msg("User %s tried to do code reload" % user)
+                log.info("User {user} tried to do code reload", user=user)
         elif command == "eval":
             truth, expr = suffix.split(":")
             truth = [s.strip() for s in truth.split(",")]
@@ -324,9 +326,10 @@ def handleCommand(protocol, user, channel, message, max_line_length,
                 password = None
             if "superadmin" in roles:
                 if password:
-                    log.msg("Joining %s (%s)" % (channel, password))
+                    log.info("Joining {channel} ({password})",
+                             channel=channel, password=password)
                 else:
-                    log.msg("Joining %s" % channel)
+                    log.info("Joining {channel}", channel=channel)
                 return protocol.callRemote("join", channel, password)
         elif command == "leave":
             channel, _, reason = suffix.partition(" ")
@@ -334,28 +337,31 @@ def handleCommand(protocol, user, channel, message, max_line_length,
                 reason = None
             if "superadmin" in roles:
                 if reason:
-                    log.msg("Leaving %s (%s)", (channel, reason))
+                    log.info("Leaving {channel} ({reason})",
+                             channel=channel, reason=reason)
                 else:
-                    log.msg("Leaving %s", channel)
+                    log.info("Leaving {channel}", channel=channel)
                 return protocol.callRemote("leave", channel, reason)
         else:
-            log.msg("Unrecognized command %s" % command)
+            log.info("Unrecognized command {command}", command=command)
 
 
 def log_and_exit(ret, reactor):
-    log.err()
+    log.failure("Critical failure, terminating application")
     reactor.stop()
 
 
 def register(root, reactor):
-    log.msg("Registering app for bot")
+    log.info("Registering app for bot")
     return root.callRemote("register", API(reactor))
+
 
 if __name__ == "__main__":
     from twisted.internet import reactor
     with open(environ["CONFIG"]) as f:
         config.update(json.load(f))
-    log.startLogging(open(config["core"]["log_file"], "a"))
+    f = open(config["log_file"], "a")
+    globalLogPublisher.addObserver(textFileLogObserver(f))
     endpoint = endpoints.StandardIOEndpoint(reactor)
     factory = pb.PBClientFactory()
     d = endpoint.listen(factory)

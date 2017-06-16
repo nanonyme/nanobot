@@ -4,7 +4,9 @@ from twisted.internet import protocol, task
 from twisted.spread import pb
 import sys
 from collections import deque
-from twisted.python import log
+from twisted.logger import textFileLogObserver, globalLogPublisher, Logger
+
+log = Logger()
 
 
 class RemoteProtocol(pb.Referenceable):
@@ -36,7 +38,7 @@ class NanoBotProtocol(irc.IRCClient):
 
     def connectionMade(self):
         irc.IRCClient.connectionMade(self)
-        log.msg("Connected to %s" % self.server.hostname)
+        log.info("Connected to {server}", server=self.server.hostname)
 
     def signedOn(self):
         irc.IRCClient.signedOn(self)
@@ -47,7 +49,7 @@ class NanoBotProtocol(irc.IRCClient):
                 self.join(channel['name'])
 
     def connectionLost(self, reason):
-        log.msg("Connection to %s lost" % self.server.hostname)
+        log.info("Connection to {server} lost", server=self.server.hostname)
         irc.IRCClient.connectionLost(self, reason)
 
     def privmsg(self, user, channel, message):
@@ -127,7 +129,7 @@ class ApiProxy(pb.Root):
     def __iter__(self):
         while True:
             if not self.app:
-                log.msg("Messages in loop but no app is connected")
+                log.info("Messages in loop but no app is connected")
                 self.running = False
                 break
             elif not self.queue:
@@ -140,7 +142,7 @@ class ApiProxy(pb.Root):
                 yield d
  
     def remote_register(self, app):
-        log.msg("Got registration request for %s" % str(app))
+        log.info("Got registration request for {app}", app=app)
         self.app = app
         self.run()
 
@@ -161,8 +163,8 @@ class ProcessProtocol(protocol.ProcessProtocol):
         self.broker.dataReceived(data)
 
     def processExited(self, status):
-        log.msg("Process exited with status code %s" % status)
-        log.msg(b"".join(self.logs))
+        log.info("Process exited with status code {status}", status=status)
+        log.info(b"".join(self.logs))
         return self.bot.reconnect_app()
 
 class NanoBot(object):
@@ -177,17 +179,17 @@ class NanoBot(object):
         self.connections = dict()
         with open(config_filename) as f:
             self.config = json.load(f)
-        log.startLogging(open(self.core_config["log_file"], "a"))
+        f = open(self.core_config["log_file"], "a")
+        globalLogPublisher.addObserver(textFileLogObserver(f))
         self.api = ApiProxy(self._reactor)
         self.server_factory = pb.PBServerFactory(self.api)
 
     def run(self):
-
         d = self.reconnect_app()
         d.addCallback(lambda _: self._init_connections())
 
     def _init_connections(self):
-        log.msg("Setting up networks")
+        log.info("Setting up networks")
         for network_config in self.config['networks']:
             network = ServerConnection(reactor=self._reactor,
                                        network_config=network_config,
@@ -196,13 +198,13 @@ class NanoBot(object):
             network.connect()
 
     def reconnect_app(self):
-        log.msg("App start requested")
+        log.info("App start requested")
         if not self.exiting:
             self.api.disconnect()
             return task.deferLater(self._reactor, 1, self._do_reconnect)
 
     def _do_reconnect(self):
-        log.msg("Starting app logic layer and telling it to connect")
+        log.info("Starting app logic layer and telling it to connect")
         self._proc = self._reactor.spawnProcess(ProcessProtocol(self,
                                                                 self.server_factory),
                                                 sys.executable,

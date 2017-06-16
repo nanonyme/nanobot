@@ -6,7 +6,9 @@ install:
   - pip install --no-index --find-links wheelhouse -r requirements.txt
 cache:
   directories:
-    - wheelhouse  
+    - wheelhouse
+git:
+  depth: 3
 python:
   - "2.7"
   - "3.5"

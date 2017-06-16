@@ -22,7 +22,7 @@ class CacheTests(unittest.TestCase):
         self.cache.update("foo", "bar")
         self.assertEquals(self.cache.fetch("foo"),
                           "bar", "Expected cache to have 'foo' for 'bar'")
-        self.clock.advance(60)        
+        self.clock.advance(60)
         value = self.cache.fetch("foo")
         self.assertIs(value, None,
                       "Cache had '%s' for entry 'foo'" % value)

@@ -80,7 +80,7 @@ class MockTreq(object):
         return defer.succeed(MockResponse("", self.headers, code=self.code))
 
     def collect(self, response, callback):
-        callback(response.data.decode("utf-8"))
+        callback(response.data)
 
 class TestMessageHandler(unittest.TestCase):
 

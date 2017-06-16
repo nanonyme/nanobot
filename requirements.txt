@@ -1,5 +1,5 @@
 Twisted[http2]
-git+git://github.com/dreid/treq.git@master
+treq
 lxml
 python-Levenshtein
 pyOpenSSL

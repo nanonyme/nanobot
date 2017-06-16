@@ -13,4 +13,4 @@ python:
 # command to install dependencies
 install: "pip install -r requirements.txt"
 # command to run tests
-script: PYTHONWARNINGS=error trial tests
+script: PYTHONPATH=. trial tests

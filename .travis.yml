@@ -2,7 +2,7 @@ sudo: false
 dist: trusty
 language: python
 install:
-  - mv wheelhouse wheelhouse.old
+  - if [ -d wheelhouse ]; then mv wheelhouse wheelhouse.old; fi
   - pip wheel --wheel-dir wheelhouse -r requirements.txt --find-links wheelhouse.old
   - pip install --no-index --find-links wheelhouse -r requirements.txt
 cache:

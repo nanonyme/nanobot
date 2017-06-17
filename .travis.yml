@@ -2,7 +2,7 @@ sudo: false
 dist: trusty
 language: python
 install:
-  - pip wheel --wheel-dir wheelhouse -r requirements.txt
+  - pip wheel --wheel-dir wheelhouse -r requirements.txt --find-links wheelhouse
   - pip install --no-index --find-links wheelhouse -r requirements.txt
 cache:
   directories:

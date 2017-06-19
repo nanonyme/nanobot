@@ -3,7 +3,7 @@ dist: trusty
 language: python
 install:
   - if [ -d wheelhouse ]; then mv wheelhouse wheelhouse.old; fi
-  - pip wheel --wheel-dir wheelhouse -r requirements.txt --find-links wheelhouse.old
+  - pip wheel --wheel-dir wheelhouse -r requirements.txt --no-cache-dir --find-links wheelhouse.old
   - pip install --no-index --find-links wheelhouse -r requirements.txt
 cache:
   directories:

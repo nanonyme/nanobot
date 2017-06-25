@@ -22,7 +22,7 @@ class EvalError(ValueError):
         super(EvalError, self).__init__(s % (self.token, self.position))
 
 def tokenize(input_text, tokens, whitespace):
-    max_len = max(len(token) for token in tokens)
+    identifier = set(tokens) | set(whitespace) | set(IDENTIFIER)
     buf = ""
     buf_pos = -1
     for i, c in enumerate(input_text):
@@ -35,7 +35,7 @@ def tokenize(input_text, tokens, whitespace):
                 yield buf_pos, buf
                 buf = ""
             yield i, c
-        elif c not in IDENTIFIER:
+        elif c not in identifier:
             raise EvalError(i, c)
         else:
             if not buf:

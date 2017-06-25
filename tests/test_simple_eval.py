@@ -74,6 +74,10 @@ class TestBoolEval(unittest.TestCase):
                                                )
                          )
 
-    def test_bad_input(self):
+    def test_bad_input_illegal(self):
         with self.assertRaisesRegexp(ValueError, "Invalid token / at position 4"):
             simple_eval.eval_bool("aef&//&||", ())
+
+    def test_bad_legal(self):
+        with self.assertRaisesRegexp(ValueError, "Invalid token & at position 2"):
+            simple_eval.eval_bool("a&&b", ())

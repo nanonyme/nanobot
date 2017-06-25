@@ -75,5 +75,5 @@ class TestBoolEval(unittest.TestCase):
                          )
 
     def test_bad_input(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegexp(ValueError, "Invalid token / at position 4"):
             simple_eval.eval_bool("aef&//&||", ())

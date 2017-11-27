@@ -361,7 +361,7 @@ if __name__ == "__main__":
     from twisted.internet import reactor
     with open(environ["CONFIG"]) as f:
         config.update(json.load(f))
-    f = open(config["log_file"], "a")
+    f = open(config["core"]["log_file"], "a")
     globalLogPublisher.addObserver(textFileLogObserver(f))
     endpoint = endpoints.StandardIOEndpoint(reactor)
     factory = pb.PBClientFactory()

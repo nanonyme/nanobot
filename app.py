@@ -35,7 +35,7 @@ config = {}
 def acceptable_netloc(hostname):
     try:
         address = ipaddress.ip_address(hostname)
-    except TypeError:
+    except ValueError:
         if hostname == "localhost":
             return False
         else:

@@ -7,17 +7,12 @@ import treq
 import lxml.html
 import re
 import Levenshtein
-try:
-    from urllib import parse as urlparse
-    urllib = urlparse
-except ImportError:
-    import urlparse
-    import urllib
-import iptools
+from urllib import parse as urlparse
 import json
 import sqlite3
 import codecs
 import simple_eval
+import ipaddress
 from twisted.logger import textFileLogObserver, globalLogPublisher, Logger
 
 log = Logger()
@@ -25,27 +20,32 @@ log = Logger()
 class AppException(Exception):
     pass
 
-INTERNAL_IPS = iptools.IpRangeList(
-    '127/8',                # full range
-    '192.168/16',               # CIDR network block
-    ('10.0.0.1', '10.0.0.19'),  # arbitrary inclusive range
-    '::1',                      # single IPv6 address
-    'fe80::/10',                # IPv6 CIDR block
-    '::ffff:172.16.0.2'         # IPv4-mapped IPv6 address
-)
+BLOCKLIST = [
+    ipaddress.IPv4Network('127.0.0.0/8'),
+    ipaddress.IPv4Network('192.168.0.0/16'),
+    ipaddress.IPv4Network('10.0.0.0/8'),
+    ipaddress.IPv4Network('172.16.0.0/12'),
+    ipaddress.IPv6Network('::1'),
+    ipaddress.IPv6Network('fe80::/10'),
+]
 
 config = {}
 
 
 def acceptable_netloc(hostname):
-    acceptable = True
     try:
-        if hostname in INTERNAL_IPS:
-            acceptable = False
+        address = ipaddress.ip_address(hostname)
     except TypeError:
         if hostname == "localhost":
-            acceptable = False
-    return acceptable
+            return False
+        else:
+            return True
+    else:
+        for network in BLOCKLIST:
+            if address in network:
+                return False
+        else:
+            return True
 
 
 class UrlHandler(object):
@@ -148,7 +148,7 @@ def dynsearch(l, s):
             return difference_check("".join(b), s)
 
 def prepare_url(url):
-    path = urllib.unquote(urlparse.urlparse(url).path).replace("-", "")
+    path = urlparse.unquote(urlparse.urlparse(url).path).replace("-", "")
     path = path.replace(" ", "").replace("+", "").replace("_", "").lower()
     path = path.rstrip("0123456789")
     return path.split("/")

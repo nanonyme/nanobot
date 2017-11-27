@@ -138,7 +138,9 @@ class ApiProxy(pb.Root):
             else:
                 seconds, args, kwargs = self.queue.popleft()
                 d = self.app.callRemote(timestamp=seconds, *args, **kwargs)
-                d.addErrback(log.err)
+                @d.addErrback
+                def log_error(failure):
+                    log.error("Ignored exception", failure=failure)
                 yield d
  
     def remote_register(self, app):

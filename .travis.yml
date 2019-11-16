@@ -1,5 +1,5 @@
 sudo: false
-dist: trusty
+dist: bionic
 language: python
 install:
   - if [ -d wheelhouse ]; then mv wheelhouse wheelhouse.old; fi

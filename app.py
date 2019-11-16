@@ -75,7 +75,7 @@ class UrlHandler(object):
 
     def handle_response(self, response, handle_body):
         if response.code != 200:
-            raise AppException("Response code %d" % response.code)
+            raise AppException(f"Response code {response.code}")
         try:
             headers = response.headers.getRawHeaders("Content-Type")
         except KeyError:
@@ -84,7 +84,7 @@ class UrlHandler(object):
             raise AppException("Empty Content-Type")
         else:
             header = headers[0]
-            log.info("Header line {header}", header=header)
+            log.info(f"Header line {header}")
             mime, _, encoding = header.partition(";")
             if encoding:
                 _, _, encoding = encoding.strip().partition("=")
@@ -93,11 +93,10 @@ class UrlHandler(object):
                 except LookupError:
                     encoding = None
             if mime not in self.accepted_mimes:
-                raise AppException("Mime %s not supported" % mime)
+                raise AppException(f"Mime {mime} not supported")
         if handle_body:
             if encoding:
-                log.info("Using encoding {encoding} to handle response",
-                         encoding=encoding)
+                log.info(f"Using encoding {encoding} to handle response")
             self.parser = self.parser_class()
             self.connection = treq.collect(response, self.feed)
             return self.connection
@@ -173,7 +172,7 @@ class MessageHandler(object):
         if title:
             if new_url:
                 self._hits.update(url, title)
-            log.info("Got title {title}", title=title)
+            log.info(f"Got title {title}")
             if dynsearch(prepare_url(url), prepare_title(title)): 
                 log.info("Will try to send title as a message")
                 d = self._callback("title: %s" % title)
@@ -186,7 +185,7 @@ class MessageHandler(object):
 
     def fail(self, err, url):
         self._misses.update(url, "miss")
-        log.failure("Adding {url} to temporary block list", err, url=url)
+        log.failure(f"Adding {url} to temporary block list", err)
 
     def __iter__(self):
         for m in re.finditer("(https?://[^ ]+)", self._message):
@@ -194,12 +193,12 @@ class MessageHandler(object):
             if not acceptable_netloc(urlparse.urlparse(url).netloc):
                 continue
             if self._misses.fetch(url):
-                log.info(("Skipped title check for URL {url} because of "
-                    "previous failures"), url=url)
+                log.info((f"Skipped title check for URL {url} because of "
+                    "previous failures"))
                 continue
             title = self._hits.fetch(url)
             if title is None:
-                log.info("Cache miss for URL {url}", url=url)
+                log.info(f"Cache miss for URL {url}")
                 handler = UrlHandler(
                     max_body=2 * 1024 ** 2, parser_class=lxml.html.HTMLParser)
                 d = handler.get_title(url)
@@ -207,7 +206,7 @@ class MessageHandler(object):
                 d.addErrback(self.fail, url)
                 yield d
             else:
-                log.info("Cache hit for URL {url}", url=url)
+                log.info(f"Cache hit for URL {url}")
                 self.success(title, url, False)
 
 
@@ -327,10 +326,9 @@ def handleCommand(protocol, user, channel, message, max_line_length,
                 password = None
             if "superadmin" in roles:
                 if password:
-                    log.info("Joining {channel} ({password})",
-                             channel=channel, password=password)
+                    log.info(f"Joining {channel} ({password})")
                 else:
-                    log.info("Joining {channel}", channel=channel)
+                    log.info(f"Joining {channel}")
                 return protocol.callRemote("join", channel, password)
         elif command == "leave":
             channel, _, reason = suffix.partition(" ")
@@ -341,10 +339,10 @@ def handleCommand(protocol, user, channel, message, max_line_length,
                     log.info("Leaving {channel} ({reason})",
                              channel=channel, reason=reason)
                 else:
-                    log.info("Leaving {channel}", channel=channel)
+                    log.info(f"Leaving {channel}")
                 return protocol.callRemote("leave", channel, reason)
         else:
-            log.info("Unrecognized command {command}", command=command)
+            log.info(f"Unrecognized command {command}")
 
 
 def log_and_exit(ret, reactor):

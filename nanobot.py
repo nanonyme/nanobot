@@ -38,7 +38,7 @@ class NanoBotProtocol(irc.IRCClient):
 
     def connectionMade(self):
         irc.IRCClient.connectionMade(self)
-        log.info("Connected to {server}", server=self.server.hostname)
+        log.info(f"Connected to {self.server.hostname}")
 
     def signedOn(self):
         irc.IRCClient.signedOn(self)
@@ -49,13 +49,13 @@ class NanoBotProtocol(irc.IRCClient):
                 self.join(channel['name'])
 
     def connectionLost(self, reason):
-        log.info("Connection to {server} lost", server=self.server.hostname)
+        log.info(f"Connection to {self.server.hostname} lost")
         irc.IRCClient.connectionLost(self, reason)
 
     def privmsg(self, user, channel, message):
         irc.IRCClient.privmsg(self, user, channel, message)
         ref = RemoteProtocol(self)
-        fmt = 'PRIVMSG %s :' % (user,)
+        fmt = f'PRIVMSG {user} :'
         max_len = self._safeMaximumLineLength(fmt) - len(fmt) - 50
         if channel == self.nickname:
             self.bot.api.callRemote("handlePrivateMessage", ref, user, channel,
@@ -144,7 +144,7 @@ class ApiProxy(pb.Root):
                 yield d
  
     def remote_register(self, app):
-        log.info("Got registration request for {app}", app=app)
+        log.info(f"Got registration request for {app}")
         self.app = app
         self.run()
 
@@ -165,7 +165,7 @@ class ProcessProtocol(protocol.ProcessProtocol):
         self.broker.dataReceived(data)
 
     def processExited(self, status):
-        log.info("Process exited with status code {status}", status=status)
+        log.info(f"Process exited with status code {status}")
         log.info(b"".join(self.logs))
         return self.bot.reconnect_app()
 
@@ -222,12 +222,12 @@ class NanoBot(object):
 
     @property
     def nickname(self):
-        return self.core_config.get('nickname', u'nanobot')
+        return self.core_config.get('nickname', 'nanobot')
 
     @property
     def realname(self):
         return self.core_config.get('realname',
-                                    u'https://bitbucket.org/nanonyme/nanobot')
+                                    'https://bitbucket.org/nanonyme/nanobot')
 
     def shutdown(self):
         self.exiting = True

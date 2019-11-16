@@ -18,8 +18,8 @@ class EvalError(ValueError):
     def __init__(self, position, token):
         self.position = position
         self.token = token
-        s = "Invalid token %s at position %s"
-        super(EvalError, self).__init__(s % (self.token, self.position))
+        s = f"Invalid token {self.token} at position {self.position}"
+        super(EvalError, self).__init__(s)
 
 def tokenize(input_text, tokens, whitespace):
     identifier = set(tokens) | set(whitespace) | set(IDENTIFIER)

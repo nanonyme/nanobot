@@ -106,10 +106,8 @@ class UrlHandler(object):
         self.parser = self.parser_class()
         return treq.collect(response, self.feed)
 
-    @wrap_async_function
     async def get_title(self, url):
-        d = defer.maybeDeferred(treq.get, url, timeout=30,
-                                headers=self.headers)
+        d = treq.get(url, timeout=30, headers=self.headers)
         await d.addCallback(self.handle_response)
 
         root = self.parser.close() 
@@ -196,7 +194,7 @@ class MessageHandler(object):
                 log.info(f"Cache miss for URL {url}")
                 handler = UrlHandler(
                     max_body=2 * 1024 ** 2, parser_class=lxml.html.HTMLParser)
-                d = handler.get_title(url)
+                d = defer.ensureDeferred(handler.get_title(url))
                 d.addCallback(self.success, url, True)
                 d.addErrback(self.fail, url)
                 yield d

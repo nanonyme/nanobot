@@ -47,13 +47,6 @@ def acceptable_netloc(hostname):
         else:
             return True
 
-def wrap_async_function(function):
-    @functools.wraps(function)
-    def wrapper(*args, **kwargs):
-        ret = function(*args, **kwargs)
-        return defer.ensureDeferred(ret)
-    return wrapper
-
 
 class UrlHandler(object):
 
@@ -80,7 +73,7 @@ class UrlHandler(object):
         else:
             self.connection.cancel()
 
-    def handle_response(self, response):
+    async def handle_response(self, response):
         if response.code != 200:
             raise AppException(f"Response code {response.code}")
         try:
@@ -104,13 +97,12 @@ class UrlHandler(object):
         if encoding:
             log.info(f"Using encoding {encoding} to handle response")
         self.parser = self.parser_class()
-        return treq.collect(response, self.feed)
+        await response.collect(self.feed)
+        return self.parser.close()
 
     async def get_title(self, url):
-        d = treq.get(url, timeout=30, headers=self.headers)
-        await d.addCallback(self.handle_response)
-
-        root = self.parser.close() 
+        response  = await treq.get(url, timeout=30, headers=self.headers)
+        root = await self.handle_response(response)
         
         title = root.xpath("//title")[0].text
 

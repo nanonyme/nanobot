@@ -61,6 +61,12 @@ class MockResponse(object):
     def getRawHeaders(self, key):
         return self._headers[key.lower()]
 
+    def collect(self, collector):
+        d = defer.Deferred()
+        d.callback(None)
+        collector(self.data)
+        return d
+
 class MockTreq(object):
     def __init__(self, url, data, headers, code=None):
         self.url = url
@@ -73,14 +79,6 @@ class MockTreq(object):
             raise Exception("Wrong URL, got %s, expected %s" % (url, self.url))
         return defer.succeed(MockResponse(self.data, self.headers,
                                           code=self.code))
-
-    def head(self, url, timeout=None, headers={}):
-        if not self.url == url:
-            raise Exception("Wrong URL, got %s, expected %s" % (url, self.url))
-        return defer.succeed(MockResponse("", self.headers, code=self.code))
-
-    def collect(self, response, callback):
-        callback(response.data)
 
 class TestMessageHandler(unittest.TestCase):
 

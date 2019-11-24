@@ -47,6 +47,13 @@ def acceptable_netloc(hostname):
         else:
             return True
 
+def wrap_async_function(function):
+    @functools.wraps(function)
+    def wrapper(*args, **kwargs):
+        ret = function(*args, **kwargs)
+        return defer.ensureDeferred(ret)
+    return wrapper
+
 
 class UrlHandler(object):
 
@@ -73,7 +80,7 @@ class UrlHandler(object):
         else:
             self.connection.cancel()
 
-    def handle_response(self, response, handle_body):
+    def handle_response(self, response):
         if response.code != 200:
             raise AppException(f"Response code {response.code}")
         try:
@@ -94,38 +101,26 @@ class UrlHandler(object):
                     encoding = None
             if mime not in self.accepted_mimes:
                 raise AppException(f"Mime {mime} not supported")
-        if handle_body:
-            if encoding:
-                log.info(f"Using encoding {encoding} to handle response")
-            self.parser = self.parser_class()
-            self.connection = treq.collect(response, self.feed)
-            return self.connection
+        if encoding:
+            log.info(f"Using encoding {encoding} to handle response")
+        self.parser = self.parser_class()
+        return treq.collect(response, self.feed)
 
-    def get_title(self, url):
-        d = defer.maybeDeferred(treq.head, url, timeout=30,
+    @wrap_async_function
+    async def get_title(self, url):
+        d = defer.maybeDeferred(treq.get, url, timeout=30,
                                 headers=self.headers)
-        d.addCallback(self.handle_response, handle_body=False)
+        await d.addCallback(self.handle_response)
 
-        @d.addCallback
-        def trigger_get(ignored):
-            return treq.get(url, timeout=30, headers=self.headers)
-        d.addCallback(self.handle_response, handle_body=True)
+        root = self.parser.close() 
+        
+        title = root.xpath("//title")[0].text
 
-        @d.addCallback
-        def obtain_tree_root(ignored):
-            return self.parser.close()
+        if not title:
+            return ""
+        else:
+            return " ".join(title.split())
 
-        @d.addCallback
-        def extract_title(root):
-            return root.xpath("//title")[0].text
-
-        @d.addCallback
-        def remove_extra_spaces(title):
-            if not title:
-                return ""
-            else:
-                return " ".join(title.split())
-        return d
 
 def difference_check(a, s):
     if len(a) < 14 or len(s) < 14:

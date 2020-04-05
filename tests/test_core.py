@@ -1,5 +1,6 @@
 from twisted.trial import unittest
 from twisted.internet import task, defer
+from collections import OrderedDict
 import nanobot
 import app
 import string
@@ -51,9 +52,9 @@ class IgnorantCache(object):
 class MockResponse(object):
     def __init__(self, data, headers, code):
         self.data = data
-        self.code = code
-        self._headers = headers
-    
+        self.code = code or 200
+        self._headers = headers or {"content-type": ("text/html;utf-8",)}
+
     @property
     def headers(self):
         return self
@@ -68,17 +69,17 @@ class MockResponse(object):
         return d
 
 class MockTreq(object):
-    def __init__(self, url, data, headers, code=None):
-        self.url = url
-        self.data = data
-        self.headers = headers
-        self.code = code or 200
+    def __init__(self, url_map):
+        self.url_map = url_map
 
     def get(self, url, timeout=None, headers={}):
-        if not self.url == url:
-            raise Exception("Wrong URL, got %s, expected %s" % (url, self.url))
-        return defer.succeed(MockResponse(self.data, self.headers,
-                                          code=self.code))
+        if url not in self.url_map:
+            raise Exception("Wrong URL, got %s, not in %s" % (url, self.url_map))
+        data = self.url_map[url]["data"]
+        headers = self.url_map[url].get("headers")
+        code = self.url_map[url].get("code")
+        
+        return defer.succeed(MockResponse(data, headers, code))
 
 class TestMessageHandler(unittest.TestCase):
 
@@ -96,60 +97,54 @@ class TestMessageHandler(unittest.TestCase):
 
     def testNoUrl(self):
         message_handler = app.MessageHandler(self.clock, self.hit_cache,
-                                             self.miss_cache, "foo bar",
+                                             self.miss_cache,
                                              lambda x: self.fail(x),
                                              255)
-        d = next(iter(message_handler), None)
-        self.assertIs(d, None, "Should not give any deferreds")
+        return defer.ensureDeferred(message_handler.find_links("foo bar"))
 
     def testUnsupportedScheme(self):
         message_handler = app.MessageHandler(self.clock, self.hit_cache,
-                                             self.miss_cache, "gopher://foo/bar#baz",
+                                             self.miss_cache,
                                              lambda x: self.fail(x),
                                              255)
-        d = next(iter(message_handler), None)
-        self.assertIs(d, None, "Should not give any deferreds")
+        return defer.ensureDeferred(message_handler.find_links("gopher://foo/bar#bar"))
 
     def testForbidden(self):
         msg = "http://foo/bar"
         message_handler = app.MessageHandler(self.clock, self.hit_cache,
-                                             self.miss_cache, msg,
+                                             self.miss_cache,
                                              lambda x: self.fail(x),
                                              255)
-        iterator = iter(message_handler)
-        d = self.step(iterator, msg, "foo", code=400)
+        d = self.step(message_handler, msg, "foo", code=400)
         d.addCallback(self.ensureException)
 
     def testUnsupportedType(self):
         msg = "http://foo/bar"
         message_handler = app.MessageHandler(self.clock, self.hit_cache,
-                                             self.miss_cache, msg,
+                                             self.miss_cache,
                                              lambda x: self.fail(x),
                                              255)
-        iterator = iter(message_handler)
-        d = self.step(iterator, msg, "foo",
+        d = self.step(message_handler, msg, "foo",
                       headers={"content-type": ("image/png",)})
         d.addCallback(self.ensureException)
 
     def testBrokenTypeHeader(self):
         msg = "http://foo/bar"
         message_handler = app.MessageHandler(self.clock, self.hit_cache,
-                                             self.miss_cache, msg,
+                                             self.miss_cache,
                                              lambda x: self.fail(x),
                                              255)
-        iterator = iter(message_handler)
-        d = self.step(iterator, msg, "foo",
+        d = self.step(message_handler, msg, "foo",
                       headers={"content-type": tuple()})
         d.addCallback(self.ensureException)
 
     def testMissingTypeHeader(self):
         msg = "http://foo/bar"
         message_handler = app.MessageHandler(self.clock, self.hit_cache,
-                                             self.miss_cache, msg,
+                                             self.miss_cache,
                                              lambda x: self.fail(x),
                                              255)
-        iterator = iter(message_handler)
-        d = self.step(iterator, msg, "foo",
+        d = self.step(message_handler, msg, "foo",
                       headers={})
         d.addCallback(self.ensureException)
 
@@ -158,14 +153,16 @@ class TestMessageHandler(unittest.TestCase):
         self.assertEqual(len(errors), 1)
 
 
-    def step(self, iterator, url, title, code=None, headers=None):
-        if headers is None:
-            headers = {"content-type": ("text/html;utf-8",)}
+    def step(self, handler, url, title, code=None, headers=None):
         self.output = "title: %s" % title
-        app.treq = MockTreq(url, self.template.substitute(title=title),
-                            headers=headers, code=code)
-        d = next(iterator)
-        title = "title: %s" % title
+        url_map = {
+            url: {
+                "code": code,
+                "data": self.template.substitute(title=title),
+                "headers": headers}
+        }
+        app.treq = MockTreq(url_map)
+        d = defer.ensureDeferred(handler.find_links(url))
         d.addCallback(lambda e: self.clock.advance(2))
         return d
         
@@ -180,21 +177,30 @@ class TestMessageHandler(unittest.TestCase):
         self.runSequence(["http://meep.com/foo/bar.baz.html#foo",
                           "https://meep.com/foo/bar.baz.html#bar"])
 
-    def callback(self, x):
-        self.assertEqual(x, self.output)
-        return defer.succeed(None)
-
     def runSequence(self, urls):
+        message = " ".join(urls)
+        expected_urls = reversed(urls)
+        url_map = {
+            url: self.urlitem_from_url(url) for url in urls
+        }
+        app.treq = MockTreq(url_map)
+        def callback(title):
+            url = urls_left_pop()
+            self.assertEqual(title, url_map[url]["title"])
         message_handler = app.MessageHandler(self.clock, self.hit_cache,
-                                             self.miss_cache, " ".join(urls),
-                                             self.callback,
-                                             255)
-        iterator = iter(message_handler)
-        d = defer.succeed(None)
-        for url in urls:
-            _, _, title = url.partition("#")
-            d.addCallback(lambda _:self.step(iterator, url, title))
-        d.addCallback(lambda _: self.assertRaises(StopIteration, next, iterator))
+                                             self.miss_cache,
+                                             callback, 255)
+        return defer.ensureDeferred(message_handler.find_links(message))
 
 
-    
+    def urlitem_from_url(self, url):
+        title = title_from_url(url)
+        return {
+            "title": title,
+            "data": self.template.substitute(title=title)
+        }
+        
+
+def title_from_url(url):
+    _, _, title = url.partition("#")
+    return title

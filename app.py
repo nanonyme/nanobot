@@ -143,33 +143,32 @@ def prepare_title(title):
 
 class MessageHandler(object):
 
-    def __init__(self, reactor, hits, misses, message, callback, max_len):
-        self._callback = callback
+    def __init__(self, reactor, hits, misses, callback, max_len):
         self._reactor = reactor
-        self._message = message
         self._hits = hits
         self._misses = misses
         self._max_len = max_len
+        self._callback = callback
 
     async def success(self, title, url, new_url):
         if len(title) > self._max_len:
             title = title[:self._max_len]
+        if new_url:
+            self._hits.update(url, title)
         if title:
-            if new_url:
-                self._hits.update(url, title)
             log.info(f"Got title {title}")
             if dynsearch(prepare_url(url), prepare_title(title)): 
                 log.info("Will try to send title as a message")
                 await self._callback("title: %s" % title)
                 await task.deferLater(self._reactor, 2, defer.succeed,
-                                           None)
+                                      None)
 
-    def fail(self, err, url):
+    def fail(self, url):
         self._misses.update(url, "miss")
-        log.failure(f"Adding {url} to temporary block list", err)
+        log.failure(f"Adding {url} to temporary block list")
 
-    def __iter__(self):
-        for m in re.finditer("(https?://[^ ]+)", self._message):
+    async def find_links(self, message):
+        for m in re.finditer("(https?://[^ ]+)", message):
             url = m.group(0)
             if not acceptable_netloc(urlparse.urlparse(url).netloc):
                 continue
@@ -182,10 +181,12 @@ class MessageHandler(object):
                 log.info(f"Cache miss for URL {url}")
                 handler = UrlHandler(
                     max_body=2 * 1024 ** 2, parser_class=lxml.html.HTMLParser)
-                d = defer.ensureDeferred(handler.get_title(url))
-                d.addCallback(self.success, url, True)
-                d.addErrback(self.fail, url)
-                yield d
+                try:
+                    title = await handler.get_title(url)
+                except Exception:
+                    self.fail(url)
+                else:
+                    await self.success(url, True)
             else:
                 log.info(f"Cache hit for URL {url}")
                 self.success(title, url, False)
@@ -257,9 +258,9 @@ class API(pb.Referenceable):
                                      max_line_length, callback)
             else:
                 handler = MessageHandler(self.reactor, self.good_urls,
-                                         self.bad_urls, message, callback,
+                                         self.bad_urls, callback,
                                          max_line_length)
-                return task.coiterate(iter(handler))
+                return defer.ensureDeferred(handler.find_links(message))
         except Exception:
             log.failure("FIXME, runaway exception")
 

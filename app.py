@@ -151,7 +151,7 @@ class MessageHandler(object):
         self._misses = misses
         self._max_len = max_len
 
-    def success(self, title, url, new_url):
+    async def success(self, title, url, new_url):
         if len(title) > self._max_len:
             title = title[:self._max_len]
         if title:
@@ -160,13 +160,9 @@ class MessageHandler(object):
             log.info(f"Got title {title}")
             if dynsearch(prepare_url(url), prepare_title(title)): 
                 log.info("Will try to send title as a message")
-                d = self._callback("title: %s" % title)
-
-                @d.addCallback
-                def postpone_next_title(ignored):
-                    return task.deferLater(self._reactor, 2, defer.succeed,
+                await self._callback("title: %s" % title)
+                await task.deferLater(self._reactor, 2, defer.succeed,
                                            None)
-                return d
 
     def fail(self, err, url):
         self._misses.update(url, "miss")

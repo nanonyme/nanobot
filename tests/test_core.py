@@ -179,14 +179,17 @@ class TestMessageHandler(unittest.TestCase):
 
     def runSequence(self, urls):
         message = " ".join(urls)
-        expected_urls = reversed(urls)
+        expected_urls = list(reversed(urls))
         url_map = {
             url: self.urlitem_from_url(url) for url in urls
         }
         app.treq = MockTreq(url_map)
         def callback(title):
-            url = urls_left_pop()
-            self.assertEqual(title, url_map[url]["title"])
+            url = expected_urls.pop()
+            expected_title = url_map[url]["title"]
+            self.assertEqual(title,  f"title: {expected_title}")
+            return defer.succeed(None)
+            
         message_handler = app.MessageHandler(self.clock, self.hit_cache,
                                              self.miss_cache,
                                              callback, 255)

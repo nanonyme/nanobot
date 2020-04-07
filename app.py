@@ -110,7 +110,7 @@ class UrlHandler(object):
             return ""
         else:
             return " ".join(title.split())
-
+    
 
 def difference_check(a, s):
     if len(a) < 14 or len(s) < 14:

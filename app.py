@@ -189,7 +189,7 @@ class MessageHandler(object):
                     await self.success(title, url, True)
             else:
                 log.info(f"Cache hit for URL {url}")
-                self.success(title, url, False)
+                await self.success(title, url, False)
 
 
 class UrlCache(object):

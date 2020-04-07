@@ -186,7 +186,7 @@ class MessageHandler(object):
                 except Exception:
                     self.fail(url)
                 else:
-                    await self.success(url, True)
+                    await self.success(title, url, True)
             else:
                 log.info(f"Cache hit for URL {url}")
                 self.success(title, url, False)

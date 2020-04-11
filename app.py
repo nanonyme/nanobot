@@ -50,6 +50,8 @@ def acceptable_netloc(hostname):
 
 class UrlHandler(object):
 
+    TIMEOUT = 30
+
     def __init__(self, max_body, parser_class,
                  accepted_mimes=("text/html",),
                  headers={"Accept-Language": "en-US",
@@ -100,8 +102,11 @@ class UrlHandler(object):
         await response.collect(self.feed)
         return self.parser.close()
 
+    async def get_url(self, url):
+        return await treq.get(url, timeout=self.TIMEOUT, headers=self.headers)
+
     async def get_title(self, url):
-        response  = await treq.get(url, timeout=30, headers=self.headers)
+        response = await self.get_url(url)
         root = await self.handle_response(response)
         
         title = root.xpath("//title")[0].text
@@ -143,6 +148,8 @@ def prepare_title(title):
 
 class MessageHandler(object):
 
+    _URL_HANDLER_CLASS = UrlHandler
+
     def __init__(self, reactor, hits, misses, callback, max_len):
         self._reactor = reactor
         self._hits = hits
@@ -179,7 +186,7 @@ class MessageHandler(object):
             title = self._hits.fetch(url)
             if title is None:
                 log.info(f"Cache miss for URL {url}")
-                handler = UrlHandler(
+                handler = self._URL_HANDLER_CLASS(
                     max_body=2 * 1024 ** 2, parser_class=lxml.html.HTMLParser)
                 try:
                     title = await handler.get_title(url)

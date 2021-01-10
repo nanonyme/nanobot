@@ -157,18 +157,13 @@ class MessageHandler(object):
         self._max_len = max_len
         self._callback = callback
 
-    async def success(self, title, url, new_url):
-        if len(title) > self._max_len:
-            title = title[:self._max_len]
-        if new_url:
-            self._hits.update(url, title)
-        if title:
-            log.info(f"Got title {title}")
-            if dynsearch(prepare_url(url), prepare_title(title)): 
-                log.info("Will try to send title as a message")
-                await self._callback("title: %s" % title)
-                await task.deferLater(self._reactor, 2, defer.succeed,
-                                      None)
+    async def success(self, title, url):
+        log.info(f"Got title {title}")
+        if dynsearch(prepare_url(url), prepare_title(title)):
+            log.info("Will try to send title as a message")
+            await self._callback("title: %s" % title)
+            await task.deferLater(self._reactor, 2, defer.succeed,
+                                  None)
 
     def fail(self, url):
         self._misses.update(url, "miss")
@@ -193,10 +188,14 @@ class MessageHandler(object):
                 except Exception:
                     self.fail(url)
                 else:
-                    await self.success(title, url, True)
+                    if len(title) > self._max_len:
+                        title = title[:self._max_len]
+                    if title:
+                        self._hits.update(url, title)
+                        await self.success(title, url)
             else:
                 log.info(f"Cache hit for URL {url}")
-                await self.success(title, url, False)
+                await self.success(title, url)
 
 
 class UrlCache(object):

@@ -259,8 +259,11 @@ class API(pb.Referenceable):
         try:
             callback = functools.partial(
                 protocol.callRemote, "msg", channel)
+            roles = resolveRoles(user)
+            if "ignored" in roles:
+                return
             if message.startswith("!"):
-                return handleCommand(protocol, user, channel, message[1:],
+                return handleCommand(protocol, user, roles, channel, message[1:],
                                      max_line_length, callback)
             else:
                 handler = MessageHandler(self.reactor, self.good_urls,
@@ -286,51 +289,54 @@ user_query = ("select roles.name from roles where roles.oid in "
               "natural join userroles where usermask.mask=?);")
 
 
-def handleCommand(protocol, user, channel, message, max_line_length,
-                  callback):
-    command, _, suffix = message.partition(" ")
+def resolveRoles(user):
     with sqlite3.connect(config["core"]["db"]) as conn:
         cur = conn.cursor()
         res = cur.execute(user_query, (user,))
-        roles = [role[0] for role in res.fetchmany()]
-        if command == "reincarnate":
-            if "superadmin" in roles:
-                log.info("Restarting app")
-                reactor.stop()
-            else:
-                log.info("User {user} tried to do code reload", user=user)
-        elif command == "eval":
-            truth, expr = suffix.split(":")
-            truth = [s.strip() for s in truth.split(",")]
-            try:
-                ret = simple_eval.eval_bool(expr, truth)
-            except simple_eval.EvalError as e:
-                callback(str(e))
-            else:
-                callback("Result: %s" % ret)
-        elif command == "join":
-            channel, _, password = suffix.partition(" ")
-            if not password:
-                password = None
-            if "superadmin" in roles:
-                if password:
-                    log.info(f"Joining {channel} ({password})")
-                else:
-                    log.info(f"Joining {channel}")
-                return protocol.callRemote("join", channel, password)
-        elif command == "leave":
-            channel, _, reason = suffix.partition(" ")
-            if not reason:
-                reason = None
-            if "superadmin" in roles:
-                if reason:
-                    log.info("Leaving {channel} ({reason})",
-                             channel=channel, reason=reason)
-                else:
-                    log.info(f"Leaving {channel}")
-                return protocol.callRemote("leave", channel, reason)
+        return [role[0] for role in res.fetchmany()]
+
+
+def handleCommand(protocol, user, roles, channel, message, max_line_length,
+                  callback):
+    command, _, suffix = message.partition(" ")
+    if command == "reincarnate":
+        if "superadmin" in roles:
+            log.info("Restarting app")
+            reactor.stop()
         else:
-            log.info(f"Unrecognized command {command}")
+            log.info("User {user} tried to do code reload", user=user)
+    elif command == "eval":
+        truth, expr = suffix.split(":")
+        truth = [s.strip() for s in truth.split(",")]
+        try:
+            ret = simple_eval.eval_bool(expr, truth)
+        except simple_eval.EvalError as e:
+            callback(str(e))
+        else:
+            callback("Result: %s" % ret)
+    elif command == "join":
+        channel, _, password = suffix.partition(" ")
+        if not password:
+            password = None
+        if "superadmin" in roles:
+            if password:
+                log.info(f"Joining {channel} ({password})")
+            else:
+                log.info(f"Joining {channel}")
+            return protocol.callRemote("join", channel, password)
+    elif command == "leave":
+        channel, _, reason = suffix.partition(" ")
+        if not reason:
+            reason = None
+        if "superadmin" in roles:
+            if reason:
+                log.info("Leaving {channel} ({reason})",
+                         channel=channel, reason=reason)
+            else:
+                log.info(f"Leaving {channel}")
+            return protocol.callRemote("leave", channel, reason)
+    else:
+        log.info(f"Unrecognized command {command}")
 
 
 def log_and_exit(ret, reactor):

@@ -27,14 +27,25 @@ class RemoteProtocol(pb.Referenceable):
 class NanoBotProtocol(irc.IRCClient):
     ping_delay = 180
 
-    def __init__(self, reactor, server, bot):
+    def __init__(self, reactor, server, bot, fallback_encoding):
         self._reactor = reactor
         self.server = server
         self.bot = bot
+        self.fallback_encoding = fallback_encoding
 
     @property
     def channels(self):
         return self.server.channels
+
+    def lineReceived(self, line):
+        try:
+            text = line.decode("utf-8")
+        except UnicodeDecodeError:
+            if self.fallback_encoding is not None:
+                text = line.decode(fallback_encoding)
+            else:
+                text = line.decode("utf-8", "ignore")
+        super().lineReceived(text)
 
     def connectionMade(self):
         irc.IRCClient.connectionMade(self)
@@ -72,10 +83,11 @@ class ServerConnection(protocol.ReconnectingClientFactory):
         self._reactor = reactor
         self.bot = bot
         self.network_config = network_config
-        self.encoding = self.network_config.get('encoding', None)
+        self.fallback_encoding = self.network_config.get('fallback_encoding', None)
 
     def buildProtocol(self, addr):
-        protocol = self.protocol(self._reactor, server=self, bot=self.bot)
+        protocol = self.protocol(self._reactor, server=self, bot=self.bot,
+                                 fallback_encoding=self.fallback_encoding)
         if self.bot.nickname:
             protocol.nickname = self.bot.nickname
         if self.bot.realname:

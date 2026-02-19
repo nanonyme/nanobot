@@ -1,0 +1,127 @@
+2026-02-19 10:18:37+0000 [-] Log opened.
+2026-02-19 10:18:37+0000 [-] --> tests.test_core.CacheTests.testGetReaperNotRun <--
+2026-02-19 10:18:37+0000 [-] --> tests.test_core.CacheTests.testReaperExpiresItem <--
+2026-02-19 10:18:37+0000 [-] --> tests.test_core.CacheTests.testReaperLeavesItem <--
+2026-02-19 10:18:37+0000 [-] --> tests.test_core.TestMessageHandler.testBrokenTypeHeader <--
+2026-02-19 10:18:37+0000 [-] Cache miss for URL http://foo/bar
+2026-02-19 10:18:37+0000 [-] Adding http://foo/bar to temporary block list
+	Traceback (most recent call last):
+	  File "/usr/lib/python3/dist-packages/twisted/internet/defer.py", line 1351, in ensureDeferred
+	    return Deferred.fromCoroutine(coro)
+	  File "/usr/lib/python3/dist-packages/twisted/internet/defer.py", line 1326, in fromCoroutine
+	    return _cancellableInlineCallbacks(coro)
+	  File "/usr/lib/python3/dist-packages/twisted/internet/defer.py", line 2172, in _cancellableInlineCallbacks
+	    _inlineCallbacks(None, gen, status, _copy_context())
+	  File "/usr/lib/python3/dist-packages/twisted/internet/defer.py", line 2003, in _inlineCallbacks
+	    result = context.run(gen.send, result)
+	--- <exception caught here> ---
+	  File "/home/runner/work/nanobot/nanobot/app.py", line 187, in find_links
+	    title = await handler.get_title(url)
+	  File "/home/runner/work/nanobot/nanobot/app.py", line 110, in get_title
+	    root = await self.handle_response(response)
+	  File "/home/runner/work/nanobot/nanobot/app.py", line 86, in handle_response
+	    raise AppException("Empty Content-Type")
+	app.AppException: Empty Content-Type
+	
+2026-02-19 10:18:37+0000 [-] --> tests.test_core.TestMessageHandler.testForbidden <--
+2026-02-19 10:18:37+0000 [-] Cache miss for URL http://foo/bar
+2026-02-19 10:18:37+0000 [-] Adding http://foo/bar to temporary block list
+	Traceback (most recent call last):
+	  File "/usr/lib/python3/dist-packages/twisted/internet/defer.py", line 1351, in ensureDeferred
+	    return Deferred.fromCoroutine(coro)
+	  File "/usr/lib/python3/dist-packages/twisted/internet/defer.py", line 1326, in fromCoroutine
+	    return _cancellableInlineCallbacks(coro)
+	  File "/usr/lib/python3/dist-packages/twisted/internet/defer.py", line 2172, in _cancellableInlineCallbacks
+	    _inlineCallbacks(None, gen, status, _copy_context())
+	  File "/usr/lib/python3/dist-packages/twisted/internet/defer.py", line 2003, in _inlineCallbacks
+	    result = context.run(gen.send, result)
+	--- <exception caught here> ---
+	  File "/home/runner/work/nanobot/nanobot/app.py", line 187, in find_links
+	    title = await handler.get_title(url)
+	  File "/home/runner/work/nanobot/nanobot/app.py", line 110, in get_title
+	    root = await self.handle_response(response)
+	  File "/home/runner/work/nanobot/nanobot/app.py", line 80, in handle_response
+	    raise AppException(f"Response code {response.code}")
+	app.AppException: Response code 400
+	
+2026-02-19 10:18:37+0000 [-] --> tests.test_core.TestMessageHandler.testHttpAndHttps <--
+2026-02-19 10:18:37+0000 [-] Cache miss for URL http://meep.com/foo/bar.baz.html#foo
+2026-02-19 10:18:37+0000 [-] Header line text/html;utf-8
+2026-02-19 10:18:37+0000 [-] Got title foo
+2026-02-19 10:18:37+0000 [-] Will try to send title as a message
+2026-02-19 10:18:37+0000 [-] --> tests.test_core.TestMessageHandler.testHttpUrl <--
+2026-02-19 10:18:37+0000 [-] Cache miss for URL http://meep.com/foo/bar.baz.html#foo
+2026-02-19 10:18:37+0000 [-] Header line text/html;utf-8
+2026-02-19 10:18:37+0000 [-] Got title foo
+2026-02-19 10:18:37+0000 [-] Will try to send title as a message
+2026-02-19 10:18:37+0000 [-] --> tests.test_core.TestMessageHandler.testMissingTypeHeader <--
+2026-02-19 10:18:37+0000 [-] Cache miss for URL http://foo/bar
+2026-02-19 10:18:37+0000 [-] Adding http://foo/bar to temporary block list
+	Traceback (most recent call last):
+	  File "/usr/lib/python3/dist-packages/twisted/internet/defer.py", line 1351, in ensureDeferred
+	    return Deferred.fromCoroutine(coro)
+	  File "/usr/lib/python3/dist-packages/twisted/internet/defer.py", line 1326, in fromCoroutine
+	    return _cancellableInlineCallbacks(coro)
+	  File "/usr/lib/python3/dist-packages/twisted/internet/defer.py", line 2172, in _cancellableInlineCallbacks
+	    _inlineCallbacks(None, gen, status, _copy_context())
+	  File "/usr/lib/python3/dist-packages/twisted/internet/defer.py", line 2003, in _inlineCallbacks
+	    result = context.run(gen.send, result)
+	--- <exception caught here> ---
+	  File "/home/runner/work/nanobot/nanobot/app.py", line 187, in find_links
+	    title = await handler.get_title(url)
+	  File "/home/runner/work/nanobot/nanobot/app.py", line 110, in get_title
+	    root = await self.handle_response(response)
+	  File "/home/runner/work/nanobot/nanobot/app.py", line 84, in handle_response
+	    raise AppException("No Content-Type")
+	app.AppException: No Content-Type
+	
+2026-02-19 10:18:37+0000 [-] --> tests.test_core.TestMessageHandler.testMultipleUrls <--
+2026-02-19 10:18:37+0000 [-] Cache miss for URL http://meep.com/foo/bar.baz.html#foo
+2026-02-19 10:18:37+0000 [-] Header line text/html;utf-8
+2026-02-19 10:18:37+0000 [-] Got title foo
+2026-02-19 10:18:37+0000 [-] Will try to send title as a message
+2026-02-19 10:18:37+0000 [-] --> tests.test_core.TestMessageHandler.testNoUrl <--
+2026-02-19 10:18:37+0000 [-] --> tests.test_core.TestMessageHandler.testUnsupportedScheme <--
+2026-02-19 10:18:37+0000 [-] --> tests.test_core.TestMessageHandler.testUnsupportedType <--
+2026-02-19 10:18:37+0000 [-] Cache miss for URL http://foo/bar
+2026-02-19 10:18:37+0000 [-] Header line image/png
+2026-02-19 10:18:37+0000 [-] Adding http://foo/bar to temporary block list
+	Traceback (most recent call last):
+	  File "/usr/lib/python3/dist-packages/twisted/internet/defer.py", line 1351, in ensureDeferred
+	    return Deferred.fromCoroutine(coro)
+	  File "/usr/lib/python3/dist-packages/twisted/internet/defer.py", line 1326, in fromCoroutine
+	    return _cancellableInlineCallbacks(coro)
+	  File "/usr/lib/python3/dist-packages/twisted/internet/defer.py", line 2172, in _cancellableInlineCallbacks
+	    _inlineCallbacks(None, gen, status, _copy_context())
+	  File "/usr/lib/python3/dist-packages/twisted/internet/defer.py", line 2003, in _inlineCallbacks
+	    result = context.run(gen.send, result)
+	--- <exception caught here> ---
+	  File "/home/runner/work/nanobot/nanobot/app.py", line 187, in find_links
+	    title = await handler.get_title(url)
+	  File "/home/runner/work/nanobot/nanobot/app.py", line 110, in get_title
+	    root = await self.handle_response(response)
+	  File "/home/runner/work/nanobot/nanobot/app.py", line 98, in handle_response
+	    raise AppException(f"Mime {mime} not supported")
+	app.AppException: Mime image/png not supported
+	
+2026-02-19 10:18:37+0000 [-] /usr/lib/python3.12/unittest/case.py:580: builtins.RuntimeWarning: TestResult has no addDuration method
+2026-02-19 10:18:37+0000 [-] /usr/lib/python3.12/unittest/case.py:580: builtins.RuntimeWarning: TestResult has no addDuration method
+2026-02-19 10:18:37+0000 [-] /usr/lib/python3.12/unittest/case.py:580: builtins.RuntimeWarning: TestResult has no addDuration method
+2026-02-19 10:18:37+0000 [-] /usr/lib/python3.12/unittest/case.py:580: builtins.RuntimeWarning: TestResult has no addDuration method
+2026-02-19 10:18:37+0000 [-] /usr/lib/python3.12/unittest/case.py:580: builtins.RuntimeWarning: TestResult has no addDuration method
+2026-02-19 10:18:37+0000 [-] /usr/lib/python3.12/unittest/case.py:580: builtins.RuntimeWarning: TestResult has no addDuration method
+2026-02-19 10:18:37+0000 [-] /usr/lib/python3.12/unittest/case.py:580: builtins.RuntimeWarning: TestResult has no addDuration method
+2026-02-19 10:18:37+0000 [-] /usr/lib/python3.12/unittest/case.py:580: builtins.RuntimeWarning: TestResult has no addDuration method
+2026-02-19 10:18:37+0000 [-] /usr/lib/python3.12/unittest/case.py:580: builtins.RuntimeWarning: TestResult has no addDuration method
+2026-02-19 10:18:37+0000 [-] /usr/lib/python3.12/unittest/case.py:580: builtins.RuntimeWarning: TestResult has no addDuration method
+2026-02-19 10:18:37+0000 [-] /usr/lib/python3.12/unittest/case.py:580: builtins.RuntimeWarning: TestResult has no addDuration method
+2026-02-19 10:18:37+0000 [-] /usr/lib/python3.12/unittest/case.py:580: builtins.RuntimeWarning: TestResult has no addDuration method
+2026-02-19 10:18:37+0000 [-] /usr/lib/python3.12/unittest/case.py:580: builtins.RuntimeWarning: TestResult has no addDuration method
+2026-02-19 10:18:37+0000 [-] /usr/lib/python3.12/unittest/case.py:580: builtins.RuntimeWarning: TestResult has no addDuration method
+2026-02-19 10:18:37+0000 [-] /usr/lib/python3.12/unittest/case.py:580: builtins.RuntimeWarning: TestResult has no addDuration method
+2026-02-19 10:18:37+0000 [-] /usr/lib/python3.12/unittest/case.py:580: builtins.RuntimeWarning: TestResult has no addDuration method
+2026-02-19 10:18:37+0000 [-] /usr/lib/python3.12/unittest/case.py:580: builtins.RuntimeWarning: TestResult has no addDuration method
+2026-02-19 10:18:37+0000 [-] /usr/lib/python3.12/unittest/case.py:580: builtins.RuntimeWarning: TestResult has no addDuration method
+2026-02-19 10:18:37+0000 [-] /usr/lib/python3.12/unittest/case.py:580: builtins.RuntimeWarning: TestResult has no addDuration method
+2026-02-19 10:18:37+0000 [-] /usr/lib/python3.12/unittest/case.py:580: builtins.RuntimeWarning: TestResult has no addDuration method
+2026-02-19 10:18:37+0000 [-] /usr/lib/python3.12/unittest/case.py:580: builtins.RuntimeWarning: TestResult has no addDuration method

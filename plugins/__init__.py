@@ -1,0 +1,1 @@
+# Plugins directory for nanobot

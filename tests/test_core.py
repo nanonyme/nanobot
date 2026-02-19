@@ -5,12 +5,13 @@ import nanobot
 import app
 import string
 import twisted.internet.base
+from plugins.title_plugin import UrlCache, MessageHandler, AppException
 twisted.internet.base.DelayedCall.debug = True
 
 class CacheTests(unittest.TestCase):
     def setUp(self):
         self.clock = task.Clock()
-        self.cache = app.UrlCache(reactor=self.clock, expiration=60)
+        self.cache = UrlCache(reactor=self.clock, expiration=60)
         self.cache.enable()
 
     def tearDown(self):
@@ -119,14 +120,14 @@ class TestMessageHandler(unittest.TestCase):
 
 
     def testNoUrl(self):
-        message_handler = app.MessageHandler(self.clock, self.hit_cache,
+        message_handler = MessageHandler(self.clock, self.hit_cache,
                                              self.miss_cache,
                                              lambda x: self.fail(x),
                                              255)
         return self.step(message_handler, "foo bar")
 
     def testUnsupportedScheme(self):
-        message_handler = app.MessageHandler(self.clock, self.hit_cache,
+        message_handler = MessageHandler(self.clock, self.hit_cache,
                                              self.miss_cache,
                                              lambda x: self.fail(x),
                                              255)
@@ -135,7 +136,7 @@ class TestMessageHandler(unittest.TestCase):
 
     def testForbidden(self):
         msg = "http://foo/bar"
-        message_handler = app.MessageHandler(self.clock, self.hit_cache,
+        message_handler = MessageHandler(self.clock, self.hit_cache,
                                              self.miss_cache,
                                              lambda x: self.fail(x),
                                              255)
@@ -145,7 +146,7 @@ class TestMessageHandler(unittest.TestCase):
 
     def testUnsupportedType(self):
         msg = "http://foo/bar"
-        message_handler = app.MessageHandler(self.clock, self.hit_cache,
+        message_handler = MessageHandler(self.clock, self.hit_cache,
                                              self.miss_cache,
                                              lambda x: self.fail(x),
                                              255)
@@ -156,7 +157,7 @@ class TestMessageHandler(unittest.TestCase):
 
     def testBrokenTypeHeader(self):
         msg = "http://foo/bar"
-        message_handler = app.MessageHandler(self.clock, self.hit_cache,
+        message_handler = MessageHandler(self.clock, self.hit_cache,
                                              self.miss_cache,
                                              lambda x: self.fail(x),
                                              255)
@@ -167,7 +168,7 @@ class TestMessageHandler(unittest.TestCase):
 
     def testMissingTypeHeader(self):
         msg = "http://foo/bar"
-        message_handler = app.MessageHandler(self.clock, self.hit_cache,
+        message_handler = MessageHandler(self.clock, self.hit_cache,
                                              self.miss_cache,
                                              lambda x: self.fail(x),
                                              255)
@@ -177,7 +178,7 @@ class TestMessageHandler(unittest.TestCase):
         return d
 
     def ensureException(self, e):
-        errors = self.flushLoggedErrors(app.AppException)
+        errors = self.flushLoggedErrors(AppException)
         self.assertEqual(len(errors), 1)
 
 
@@ -218,7 +219,7 @@ class TestMessageHandler(unittest.TestCase):
             self.clock.advance(2)
             return defer.succeed(None)
             
-        message_handler = app.MessageHandler(self.clock, self.hit_cache,
+        message_handler = MessageHandler(self.clock, self.hit_cache,
                                              self.miss_cache,
                                              callback, 255)
         patch_handler(message_handler, MockTreq(url_map))

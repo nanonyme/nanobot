@@ -279,12 +279,18 @@ class NanoBotTests(unittest.TestCase):
     
     def setUp(self):
         self.clock = task.Clock()
+        # Create a temporary log file
+        self.log_file = tempfile.NamedTemporaryFile(
+            mode='w', suffix='.log', delete=False
+        )
+        self.log_file.close()
+        
         # Create a temporary config file
         self.config_data = {
             'core': {
                 'nickname': 'testbot',
                 'realname': 'Test Bot',
-                'log_file': '/tmp/test.log'
+                'log_file': self.log_file.name
             },
             'networks': [
                 {
@@ -302,12 +308,12 @@ class NanoBotTests(unittest.TestCase):
         self.config_file.close()
     
     def tearDown(self):
-        # Clean up temp file
+        # Clean up temp config file
         if os.path.exists(self.config_file.name):
             os.unlink(self.config_file.name)
-        # Clean up log file
-        if os.path.exists('/tmp/test.log'):
-            os.unlink('/tmp/test.log')
+        # Clean up temp log file
+        if os.path.exists(self.log_file.name):
+            os.unlink(self.log_file.name)
     
     def test_init_loads_config(self):
         """Test NanoBot.__init__ loads config from file"""

@@ -5,6 +5,7 @@ from twisted.spread import pb
 import sys
 from collections import deque
 from twisted.logger import textFileLogObserver, globalLogPublisher, Logger
+from plugin import PluginRegistry
 
 log = Logger()
 
@@ -22,6 +23,33 @@ class RemoteProtocol(pb.Referenceable):
 
     def remote_leave(self, channel, reason):
         self.protocol.leave(channel, reason)
+
+    def remote_topic(self, channel, topic=None):
+        self.protocol.topic(channel, topic)
+
+    def remote_mode(self, chan, set, modes, limit=None, user=None, mask=None):
+        self.protocol.mode(chan, set, modes, limit, user, mask)
+
+    def remote_kick(self, channel, user, reason=None):
+        self.protocol.kick(channel, user, reason)
+
+    def remote_invite(self, user, channel):
+        self.protocol.invite(user, channel)
+
+    def remote_quit(self, message=None):
+        self.protocol.quit(message)
+
+    def remote_describe(self, channel, action):
+        self.protocol.describe(channel, action)
+
+    def remote_notice(self, user, message):
+        self.protocol.notice(user, message)
+
+    def remote_away(self, message=None):
+        self.protocol.away(message)
+
+    def remote_back(self):
+        self.protocol.back()
 
 
 class NanoBotProtocol(irc.IRCClient):
@@ -42,6 +70,8 @@ class NanoBotProtocol(irc.IRCClient):
 
     def signedOn(self):
         irc.IRCClient.signedOn(self)
+        # Call plugin handlers for signedOn event
+        self._dispatch_event('signed_on')
         for channel in self.channels:
             if 'key' in channel:
                 self.join(channel['name'], channel['key'])
@@ -54,6 +84,8 @@ class NanoBotProtocol(irc.IRCClient):
 
     def privmsg(self, user, channel, message):
         irc.IRCClient.privmsg(self, user, channel, message)
+        # Call plugin handlers for privmsg event
+        self._dispatch_event('privmsg', user, channel, message)
         ref = RemoteProtocol(self)
         fmt = f'PRIVMSG {user} :'
         max_len = self._safeMaximumLineLength(fmt) - len(fmt) - 50
@@ -63,6 +95,58 @@ class NanoBotProtocol(irc.IRCClient):
         else:
             self.bot.api.callRemote("handlePublicMessage", ref, user, channel,
                                     message, max_len)
+
+    def userJoined(self, user, channel):
+        """Called when a user joins a channel."""
+        irc.IRCClient.userJoined(self, user, channel)
+        self._dispatch_event('user_joined', user, channel)
+
+    def userLeft(self, user, channel):
+        """Called when a user leaves a channel."""
+        irc.IRCClient.userLeft(self, user, channel)
+        self._dispatch_event('user_left', user, channel)
+
+    def userQuit(self, user, quitMessage):
+        """Called when a user quits IRC."""
+        irc.IRCClient.userQuit(self, user, quitMessage)
+        self._dispatch_event('user_quit', user, quitMessage)
+
+    def userKicked(self, kickee, channel, kicker, message):
+        """Called when a user is kicked from a channel."""
+        irc.IRCClient.userKicked(self, kickee, channel, kicker, message)
+        self._dispatch_event('user_kicked', kickee, channel, kicker, message)
+
+    def action(self, user, channel, data):
+        """Called when a user performs an action (/me)."""
+        irc.IRCClient.action(self, user, channel, data)
+        self._dispatch_event('action', user, channel, data)
+
+    def topicUpdated(self, user, channel, newTopic):
+        """Called when the topic for a channel changes."""
+        irc.IRCClient.topicUpdated(self, user, channel, newTopic)
+        self._dispatch_event('topic_updated', user, channel, newTopic)
+
+    def userRenamed(self, oldname, newname):
+        """Called when a user changes their nickname."""
+        irc.IRCClient.userRenamed(self, oldname, newname)
+        self._dispatch_event('user_renamed', oldname, newname)
+
+    def _dispatch_event(self, event_type, *args, **kwargs):
+        """
+        Dispatch an event to registered plugin handlers.
+        
+        Args:
+            event_type: Type of event to dispatch
+            *args: Positional arguments to pass to handlers
+            **kwargs: Keyword arguments to pass to handlers
+        """
+        if hasattr(self.bot, 'plugin_registry'):
+            handlers = self.bot.plugin_registry.get_handlers(event_type)
+            for handler in handlers:
+                try:
+                    handler(self, *args, **kwargs)
+                except Exception as e:
+                    log.failure(f"Error in plugin handler for {event_type}: {e}")
 
 
 class ServerConnection(protocol.ReconnectingClientFactory):
@@ -185,10 +269,23 @@ class NanoBot(object):
         globalLogPublisher.addObserver(textFileLogObserver(f))
         self.api = ApiProxy(self._reactor)
         self.server_factory = pb.PBServerFactory(self.api)
+        # Initialize plugin registry
+        self.plugin_registry = PluginRegistry(self._reactor, self.config)
 
     def run(self):
+        # Load plugins before connecting to networks
+        self._load_plugins()
         d = self.reconnect_app()
         d.addCallback(lambda _: self._init_connections())
+
+    def _load_plugins(self):
+        """Load plugins from configuration."""
+        plugin_configs = self.config.get('plugins', [])
+        if plugin_configs:
+            log.info(f"Loading {len(plugin_configs)} plugins")
+            self.plugin_registry.load_plugins(plugin_configs)
+        else:
+            log.info("No plugins configured")
 
     def _init_connections(self):
         log.info("Setting up networks")

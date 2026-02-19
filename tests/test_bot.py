@@ -69,6 +69,36 @@ class RemoteProtocolTests(unittest.TestCase):
         self.assertEqual(len(self.mock_protocol.left), 1)
         self.assertEqual(self.mock_protocol.left[0], ("#test", "goodbye"))
 
+    def test_remote_topic(self):
+        """Test remote_topic forwards to protocol.topic"""
+        self.remote.remote_topic("#test", "New topic")
+        self.assertEqual(len(self.mock_protocol.topics), 1)
+        self.assertEqual(self.mock_protocol.topics[0], ("#test", "New topic"))
+
+    def test_remote_kick(self):
+        """Test remote_kick forwards to protocol.kick"""
+        self.remote.remote_kick("#test", "baduser", "misbehaving")
+        self.assertEqual(len(self.mock_protocol.kicks), 1)
+        self.assertEqual(self.mock_protocol.kicks[0], ("#test", "baduser", "misbehaving"))
+
+    def test_remote_invite(self):
+        """Test remote_invite forwards to protocol.invite"""
+        self.remote.remote_invite("friend", "#test")
+        self.assertEqual(len(self.mock_protocol.invites), 1)
+        self.assertEqual(self.mock_protocol.invites[0], ("friend", "#test"))
+
+    def test_remote_describe(self):
+        """Test remote_describe forwards to protocol.describe"""
+        self.remote.remote_describe("#test", "waves hello")
+        self.assertEqual(len(self.mock_protocol.describes), 1)
+        self.assertEqual(self.mock_protocol.describes[0], ("#test", "waves hello"))
+
+    def test_remote_notice(self):
+        """Test remote_notice forwards to protocol.notice"""
+        self.remote.remote_notice("user1", "Important notice")
+        self.assertEqual(len(self.mock_protocol.notices), 1)
+        self.assertEqual(self.mock_protocol.notices[0], ("user1", "Important notice"))
+
 
 class MockIRCProtocol:
     """Mock IRC protocol for testing"""
@@ -76,6 +106,11 @@ class MockIRCProtocol:
         self.sent = []
         self.joined = []
         self.left = []
+        self.topics = []
+        self.kicks = []
+        self.invites = []
+        self.describes = []
+        self.notices = []
     
     def msg(self, user, message):
         self.sent.append(("msg", user, message))
@@ -85,6 +120,33 @@ class MockIRCProtocol:
     
     def leave(self, channel, reason=None):
         self.left.append((channel, reason))
+
+    def topic(self, channel, topic=None):
+        self.topics.append((channel, topic))
+
+    def mode(self, chan, set, modes, limit=None, user=None, mask=None):
+        pass
+
+    def kick(self, channel, user, reason=None):
+        self.kicks.append((channel, user, reason))
+
+    def invite(self, user, channel):
+        self.invites.append((user, channel))
+
+    def quit(self, message=None):
+        pass
+
+    def describe(self, channel, action):
+        self.describes.append((channel, action))
+
+    def notice(self, user, message):
+        self.notices.append((user, message))
+
+    def away(self, message=None):
+        pass
+
+    def back(self):
+        pass
 
 
 class NanoBotProtocolTests(unittest.TestCase):
@@ -148,6 +210,55 @@ class NanoBotProtocolTests(unittest.TestCase):
         self.assertEqual(args[2], "user1!~user@host")
         self.assertEqual(args[3], "testbot")
         self.assertEqual(args[4], "hello")
+
+    def test_event_dispatch_with_plugin_registry(self):
+        """Test that events are dispatched to plugin handlers"""
+        from plugin import PluginRegistry
+        
+        # Create a plugin registry and register a handler
+        registry = PluginRegistry(self.clock, {})
+        handler_calls = []
+        
+        def test_handler(protocol, user, channel, message):
+            handler_calls.append((user, channel, message))
+        
+        registry.register_handler('privmsg', test_handler)
+        self.bot.plugin_registry = registry
+        
+        # Receive a message
+        self.protocol.privmsg("user1!~user@host", "#test", "test message")
+        
+        # Check that plugin handler was called
+        self.assertEqual(len(handler_calls), 1)
+        self.assertEqual(handler_calls[0], ("user1!~user@host", "#test", "test message"))
+
+    def test_event_dispatch_handles_handler_errors(self):
+        """Test that handler errors don't break event dispatching"""
+        from plugin import PluginRegistry
+        
+        registry = PluginRegistry(self.clock, {})
+        
+        def failing_handler(protocol, *args):
+            raise Exception("Handler error")
+        
+        def working_handler(protocol, *args):
+            working_handler.called = True
+        
+        working_handler.called = False
+        
+        registry.register_handler('privmsg', failing_handler)
+        registry.register_handler('privmsg', working_handler)
+        self.bot.plugin_registry = registry
+        
+        # This should not raise an exception
+        self.protocol.privmsg("user1!~user@host", "#test", "test")
+        
+        # Working handler should still be called despite the first one failing
+        self.assertTrue(working_handler.called)
+        
+        # Flush logged errors
+        errors = self.flushLoggedErrors(Exception)
+        self.assertEqual(len(errors), 1)
 
 
 class ServerConnectionTests(unittest.TestCase):

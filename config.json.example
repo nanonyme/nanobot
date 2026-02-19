@@ -27,6 +27,16 @@
             "keywords": ["hello", "hi"],
             "response": "Hey! How can I help?"
          }
+      },
+      {
+         "name": "eval",
+         "module": "plugins.eval_plugin",
+         "enabled": true
+      },
+      {
+         "name": "admin",
+         "module": "plugins.admin_plugin",
+         "enabled": true
       }
    ]
 }

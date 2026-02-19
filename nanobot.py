@@ -273,7 +273,7 @@ class NanoBot(object):
         self.plugin_registry = PluginRegistry(self._reactor, self.config)
 
     def run(self):
-        # Load plugins before initializing connections
+        # Load plugins before connecting to networks
         self._load_plugins()
         d = self.reconnect_app()
         d.addCallback(lambda _: self._init_connections())
